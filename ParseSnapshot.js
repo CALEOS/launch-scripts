@@ -11,7 +11,7 @@ const log = logger.stdout;
 class Parser {
 
     constructor() {
-        this.jsonrpc = new eosjs.Rpc.JsonRpc("http://127.0.0.1:9888", { fetch });
+        this.jsonrpc = new eosjs.JsonRpc("http://127.0.0.1:9888", { fetch });
         this.filename = "./snapshot.csv";
         this.parsedFilename = "./snapshotParsed.csv";
         this.balancesChecked = 0;
