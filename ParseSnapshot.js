@@ -183,7 +183,8 @@ class Parser {
             this.creationActionQueue = [];
             log("Created " + this.accountsCreated + " accounts");
         }).catch(e => {
-            throw Error("Failed to create " + this.creationActionQueue.length + "accounts: " + e);
+            console.log("Error while writing the action queue: " + e.message);
+            process.exit(1);
         });
     }
 
