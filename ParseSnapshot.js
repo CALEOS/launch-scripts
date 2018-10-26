@@ -406,7 +406,6 @@ if (args.inject == "true" && !args.private_key)
     throw new Error("Must provide a private key to do injection");
 
 let debugAccounts = JSON.parse(args.debug_accounts);
-console.log(debugAccounts);
 
 let opts = {
     httpEndpoint: args["http-endpoint"],
