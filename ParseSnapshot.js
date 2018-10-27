@@ -96,6 +96,11 @@ class Parser {
 
     async injectAccount(accountName) {
         let thisAcct = this.accounts[accountName];
+        
+        if (this.debug) {
+            console.log(thisAcct);
+        }
+        
         let actions = [{
             account: 'eosio',
             name: 'newaccount',
@@ -175,7 +180,7 @@ class Parser {
         if (this.creationActionQueue.length === 0)
             return;
 
-        if (this.debug)
+        if (false && this.debug)
             console.log("writeActionQueue writing actions: " + JSON.stringify(this.creationActionQueue, null, 4));
         
         let createResult = await this.api.transact({
