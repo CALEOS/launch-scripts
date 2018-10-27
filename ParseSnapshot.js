@@ -98,7 +98,7 @@ class Parser {
         let thisAcct = this.accounts[accountName];
         
         if (this.debug) {
-            console.log(thisAcct);
+            console.log(JSON.stringify(thisAcct, null, 4));
         }
         
         let actions = [{
