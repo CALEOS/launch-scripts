@@ -18,6 +18,7 @@ class Parser {
         this.shouldValidateStake = opts.validateStake;
         this.shouldWriteCsv = opts.writeCsv;
         this.debugAccounts = opts.debugAccounts;
+        this.debug = opts.debug;
         let sigProvider = this.shouldInject ? new eosjs.JsSignatureProvider([opts.privateKey]) : null;
         this.api = new eosjs.Api({
             rpc: this.jsonrpc,
@@ -174,6 +175,9 @@ class Parser {
         if (this.creationActionQueue.length === 0)
             return;
 
+        if (this.debug)
+            console.log("writeActionQueue writing actions: " + JSON.stringify(this.createActionQueue, null, 4));
+        
         let createResult = await this.api.transact({
             actions: this.creationActionQueue
         }, {
@@ -395,6 +399,14 @@ argParser.addArgument(
     }
 );
 
+argParser.addArgument(
+    '--debug',
+    {
+        defaultValue: 'false',
+        help: 'Enable verbose debugging'
+    }
+);
+
 let args = argParser.parseArgs();
 
 if (!args["http-endpoint"])
@@ -417,7 +429,8 @@ let opts = {
     validateStake: args.validate_stake === "true",
     writeCsv: args.write_csv === "true",
     snapshotOutput: args.snapshot_output,
-    debugAccounts: debugAccounts
+    debugAccounts: debugAccounts,
+    debug: args.debug === "true"
 };
 
 (new Parser(opts).parse());
