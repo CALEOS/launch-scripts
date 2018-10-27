@@ -29,6 +29,7 @@ class Parser {
         this.snapshotInput = opts.snapshotInput;
         this.balancesChecked = 0;
         this.accountsCreated = 0;
+        this.queuesWritten = 0;
         this.creationActionQueue = [];
         this.accounts = {};
 
@@ -189,10 +190,13 @@ class Parser {
             blocksBehind: 3,
             expireSeconds: 30,
         }).then(r => {
+            if (this.debug)
+                console.log("Wrote action queue " + ++this.queuesWritten);
+
             this.creationActionQueue = [];
             log("Created " + this.accountsCreated + " accounts");
         }).catch(e => {
-            console.log("Error while writing the action queue: " + e.message);
+            console.log("Error while writing the action queue: " + e.message + "\n\nAction queue was: " + this.creationActionQueue);
             process.exit(1);
         });
     }
