@@ -176,7 +176,7 @@ class Parser {
             return;
 
         if (this.debug)
-            console.log("writeActionQueue writing actions: " + JSON.stringify(this.createActionQueue, null, 4));
+            console.log("writeActionQueue writing actions: " + JSON.stringify(this.creationActionQueue, null, 4));
         
         let createResult = await this.api.transact({
             actions: this.creationActionQueue
