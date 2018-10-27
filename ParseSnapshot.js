@@ -196,7 +196,7 @@ class Parser {
             this.creationActionQueue = [];
             log("Created " + this.accountsCreated + " accounts");
         }).catch(e => {
-            console.log("Error while writing the action queue: " + e.message + "\n\nAction queue was: " + this.creationActionQueue);
+            console.log("Error while writing the action queue: " + e.message + "\n\nAction queue was: " + JSON.stringify(this.creationActionQueue, null, 4));
             process.exit(1);
         });
     }
