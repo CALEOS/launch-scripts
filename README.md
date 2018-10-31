@@ -4,6 +4,8 @@
 - And then in the same directory as you'll run the script from, you'll want a file named snapshot.csv, without a header line
 - In that same directory you'll also want to run `npm install readline eosjs@beta node-fetch text-encoding promise-parallel-throttle single-line-log argparse`
 
+To survive injection with batch size of 600 actions per transaction you'll need `max-transaction-time = 100000` in your config.ini and for genesis.json `"max_block_cpu_usage": 50000000,` and `"max_transaction_cpu_usage": 5000000,`
+
 The script has arguments, you can learn about them by calling `node ParseSnapshot.js -h` and you should see
 ```
 node ParseSnapshot.js -h
