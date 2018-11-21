@@ -1,0 +1,25 @@
+{
+  "name": "launch-scripts",
+  "version": "1.0.0",
+  "description": "- For the ParseSnapshot.js file, you'll need a recent version of nodejs (latest ubuntu doesn't come with the latest nodejs by default) - And then in the same directory as you'll run the script from, you'll want a file named snapshot.csv, without a header line - In that same directory you'll also want to run `npm install readline eosjs@beta node-fetch text-encoding promise-parallel-throttle single-line-log argparse`",
+  "main": "Launcher.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@caleos.github.com:CALEOS/launch-scripts.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "argparse": "^1.0.10",
+    "eosjs": "^20.0.0-beta2",
+    "node-fetch": "^2.3.0",
+    "promise-parallel-throttle": "^3.2.0",
+    "readline": "^1.3.0",
+    "single-line-log": "^1.1.2",
+    "text-encoding": "^0.7.0"
+  }
+}
