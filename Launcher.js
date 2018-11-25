@@ -20,6 +20,29 @@ const actionsPerTransaction = 600;
 const injectionThreadCount = 1;
 const walletName = 'genesis';
 const walletPassword = '';
+const maxTrxCpu = 4294967194;
+const maxBlockCpu = 4294967295;
+
+const globalValues = {
+    "max_transaction_delay": 3888000,
+    "min_transaction_cpu_usage": 100,
+    "net_usage_leeway": 500,
+    "context_free_discount_net_usage_den": 100,
+    "max_transaction_net_usage": 524288,
+    "context_free_discount_net_usage_num": 20,
+    "max_transaction_lifetime": 3600,
+    "deferred_trx_expiration_window": 600,
+    "max_authority_depth": 6,
+    "max_transaction_cpu_usage": 4294967194,
+    "max_block_net_usage": 1048576,
+    "target_block_net_usage_pct": 1000,
+    "max_generated_transaction_count": 16,
+    "max_inline_action_size": 4096,
+    "target_block_cpu_usage_pct": 500,
+    "base_per_transaction_net_usage": 12,
+    "max_block_cpu_usage": 4294967295,
+    "max_inline_action_depth": 4
+};
 
 const tokenIssuances = {
     'Genesis Snapshot': '178473249.3125',
@@ -94,7 +117,6 @@ class Launcher {
 
     async launch() {
         this.log('Launch beginning...');
-        // TODO: await this.setGlobals(true);
         await this.createEosioAccounts();
         await this.createAndIssueTokens();
         await this.pushContract('eosio.msig');
@@ -109,7 +131,6 @@ class Launcher {
         await this.initSystem();
         await this.injectGenesis();
 
-        // TODO: await this.setGlobals(false);
         // DO THIS LAST!!!
         await this.pushContract('eosio.trail');
         await this.setCodePermission(contracts['eosio.trail']);
@@ -118,10 +139,27 @@ class Launcher {
     }
 
     async setGlobals(highCpu) {
-        //TODO: set global, high cpu if true
+        this.log(`Setting globals to ${highCpu ? 'high' : 'low'} cpu`);
+        let globals = Object.assign({}, globalValues);
+        if (highCpu) {
+            globals.max_transaction_cpu_usage = maxTrxCpu;
+            globals.max_block_cpu_usage = maxBlockCpu;
+        }
+        return this.sendActions([
+            {
+                account: 'eosio',
+                name: 'setparams',
+                authorization: [{
+                    actor: 'eosio',
+                    permission: 'active'
+                }],
+                data: {
+                    params: globals
+                }
+            }
+        ]);
     }
 
-    // `void init( unsigned_int version, symbol core );`
     async initSystem() {
         this.log("Initializing system");
         return this.sendActions([
@@ -134,11 +172,10 @@ class Launcher {
                 }],
                 data: {
                     version: initVersion,
-                    core: '4,' + tokenSymbol
+                    core: `4,${tokenSymbol}`
                 }
             }
         ]);
-        this.log("Done initializing system");
     }
 
     async createEosioAccounts() {
@@ -171,7 +208,8 @@ class Launcher {
                         "accounts": [{
                             "permission": {"actor": "eosio", "permission": "active"},
                             "weight": 1
-                        }, {"permission": {"actor": accountName, "permission": "eosio.code"},
+                        }, {
+                            "permission": {"actor": accountName, "permission": "eosio.code"},
                             "weight": 1
                         }]
                     }
@@ -183,7 +221,9 @@ class Launcher {
     async injectGenesis() {
         this.log("Getting genesis accounts...");
         this.genesisAccounts = await this.getGenesisAccounts();
+        await this.setGlobals(true);
         await this.injectAccounts(this.genesisAccounts);
+        await this.setGlobals(false);
     }
 
     async injectAccounts(accounts) {
@@ -241,7 +281,7 @@ class Launcher {
 
     async getGenesisAccounts() {
         let _this = this;
-        return new Promise(async function (resolve, reject) {
+        return new Promise(async function(resolve, reject) {
             let accounts = {};
             let snapMeta = {};
             await _this.readCsv('./snapshot.csv', function(line) {
