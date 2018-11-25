@@ -6,13 +6,20 @@ const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 const readline = require('readline');
 const fetch = require('node-fetch');
+const Throttle = require('promise-parallel-throttle');
 const {TextDecoder, TextEncoder} = require('text-encoding');
 const SnapshotHandler = require('./SnapshotHandler');
 const opts = require('./opts.js');
 const endpoint = 'http://localhost:' + opts.apiPort;
 
+const genesisMemo = 'Genesis';
+const initVersion = 0;
 const tokenSymbol = 'TLOS';
 const maxSupply = '10000000000.0000';
+const actionsPerTransaction = 600;
+const injectionThreadCount = 1;
+const walletName = 'genesis';
+const walletPassword = '';
 
 const tokenIssuances = {
     'Genesis Snapshot': '178473249.3125',
@@ -59,11 +66,18 @@ class Launcher {
         this.jsonrpc = new this.eosjs.JsonRpc(endpoint, {fetch});
         this.contractsDir = opts.contractsDir.replace(/\/$/, '');
         this.teclos = opts.teclos + ' -u http://127.0.0.1:' + opts.apiPort;
+        this.sigProvider = new this.eosjs.JsSignatureProvider([opts.eosioPrivate]);
+        this.loadApi();
+    }
 
-        let sigProvider = new this.eosjs.JsSignatureProvider([opts.eosioPrivate]);
-        this.api = new this.eosjs.Api({
+    loadApi() {
+        this.api = this.getApi();
+    }
+
+    getApi() {
+        return new this.eosjs.Api({
             rpc: this.jsonrpc,
-            signatureProvider: sigProvider,
+            signatureProvider: this.sigProvider,
             textEncoder: new TextEncoder,
             textDecoder: new TextDecoder
         });
@@ -71,42 +85,74 @@ class Launcher {
 
     async test() {
         let accts = await this.getGenesisAccounts();
-        console.log(accts);
+        this.log(accts);
+    }
+
+    async sleep(ms) {
+        await new Promise(resolve => setTimeout(resolve, ms));
     }
 
     async launch() {
-        console.log('Launch beginning...');
+        this.log('Launch beginning...');
+        // TODO: await this.setGlobals(true);
         await this.createEosioAccounts();
         await this.createAndIssueTokens();
         await this.pushContract('eosio.msig');
-        await this.setMsigPriv();
+        //await this.setMsigPriv();
         await this.pushContract('eosio.amend');
         await this.setCodePermission(contracts['eosio.amend']);
-        await this.pushContract('eosio.saving');
+        //await this.pushContract('eosio.saving');
         await this.setCodePermission(contracts['eosio.saving']);
         await this.pushContract('eosio.wrap');
         await this.pushContract('eosio.system');
+        this.loadApi();
+        await this.initSystem();
         await this.injectGenesis();
 
+        // TODO: await this.setGlobals(false);
         // DO THIS LAST!!!
         await this.pushContract('eosio.trail');
         await this.setCodePermission(contracts['eosio.trail']);
-        await this.regBallot();
-        console.log('Launch complete!');
+        //await this.regBallot();
+        this.log('Launch complete!');
+    }
+
+    async setGlobals(highCpu) {
+        //TODO: set global, high cpu if true
+    }
+
+    // `void init( unsigned_int version, symbol core );`
+    async initSystem() {
+        this.log("Initializing system");
+        return this.sendActions([
+            {
+                account: 'eosio',
+                name: 'init',
+                authorization: [{
+                    actor: 'eosio',
+                    permission: 'active',
+                }],
+                data: {
+                    version: initVersion,
+                    core: '4,' + tokenSymbol
+                }
+            }
+        ]);
+        this.log("Done initializing system");
     }
 
     async createEosioAccounts() {
-        console.log('Creating eosio accounts...');
+        this.log('Creating eosio accounts...');
         let promises = [];
         for (let i = 0; i < eosioAccounts.length; i++) {
             promises.push(this.createSystemAccount(eosioAccounts[i]));
         }
         await Promise.all(promises);
-        console.log('eosio accounts created');
+        this.log('eosio accounts created');
     }
 
     async setCodePermission(accountName) {
-        this.sendActions([
+        return this.sendActions([
             {
                 account: 'eosio',
                 name: 'updateauth',
@@ -131,18 +177,66 @@ class Launcher {
                     }
                 }
             }
-
         ])
     }
 
     async injectGenesis() {
-        console.log("Getting genesis accounts...");
+        this.log("Getting genesis accounts...");
         this.genesisAccounts = await this.getGenesisAccounts();
-        console.log("Injecting genesis accounts...");
         await this.injectAccounts(this.genesisAccounts);
     }
 
     async injectAccounts(accounts) {
+        this.log("Injecting accounts...");
+        this.accountInjectionCount = 0;
+        let actions = [];
+        let actionChunks = [];
+        for (let accountName in accounts) {
+            if (!accounts.hasOwnProperty((accountName)))
+                continue;
+
+            this.accountInjectionCount++;
+
+            if (this.accountInjectionCount % 10000 === 0)
+                this.log("Created " + this.accountInjectionCount + " account promises");
+
+            let account = accounts[accountName];
+            actions = actions.concat(this.getAccountActions(account, genesisMemo));
+            if (actions.length >= actionsPerTransaction) {
+                actionChunks.push(actions);
+                actions = [];
+            }
+        }
+
+        let thisLauncher = this;
+
+        async function sendWorker() {
+            while (actionChunks.length) {
+                if (actionChunks.length % 10 === 0)
+                    thisLauncher.log(actionChunks.length + " action chunks left");
+
+                await thisLauncher.sendActions(actionChunks.shift());
+            }
+            /*
+            if (actionChunks.length % 10 === 0)
+                thisLauncher.log(actionChunks.length + " action chunks left");
+
+            if (actionChunks.length) {
+                await thisLauncher.sendActions(actionChunks.shift());
+                thisLauncher.log("Done sending actions in worker, recursing");
+                await sendWorker();
+            }
+            */
+        }
+
+        let threads = [];
+        this.log("Starting " + injectionThreadCount + " injection \"workers\"");
+        this.log("Will be injecting " + actionChunks.length + " batches of actions");
+        for (let i = 0; i < injectionThreadCount; i++)
+            threads.push(sendWorker());
+
+        await Promise.all(threads);
+        this.log("Done injecting");
     }
 
     async getGenesisAccounts() {
@@ -174,12 +268,12 @@ class Launcher {
                 let netStake = _this.forcePrecision(remainder - cpuStake);
 
                 if (_this.debugAccounts && _this.debugAccounts.indexOf(accountName) > -1) {
-                    console.log("Account " + accountName + " =========");
-                    console.log("balance: " + balance);
-                    console.log("remainder: " + remainder);
-                    console.log("liquid: " + liquid);
-                    console.log("cpuStake: " + cpuStake);
-                    console.log("netStake: " + netStake);
+                    this.log("Account " + accountName + " =========");
+                    this.log("balance: " + balance);
+                    this.log("remainder: " + remainder);
+                    this.log("liquid: " + liquid);
+                    this.log("cpuStake: " + cpuStake);
+                    this.log("netStake: " + netStake);
                 }
 
                 accounts[accountName] = {
@@ -241,7 +335,7 @@ class Launcher {
             }],
             data: {
                 issuer: 'eosio.token',
-                maximum_supply: '10000000000.0000 TLOS'
+                maximum_supply: `${maxSupply} ${tokenSymbol}`
             }
         }];
         for (let memo in tokenIssuances) {
@@ -254,7 +348,7 @@ class Launcher {
                 }],
                 data: {
                     to: 'eosio',
-                    quantity: tokenIssuances[memo] + ' TLOS',
+                    quantity: `${tokenIssuances[memo]} ${tokenSymbol}`,
                     memo: memo
                 }
             });
@@ -264,12 +358,12 @@ class Launcher {
     }
 
     async sendActions(actions) {
-        await this.api.transact({
+        return this.api.transact({
             actions: actions
         }, {
             blocksBehind: 3,
             expireSeconds: 30,
-        })
+        });
     }
 
     async readCsv(path, callback) {
@@ -295,7 +389,7 @@ class Launcher {
             }],
             data: {
                 creator: 'eosio',
-                name: accountName,
+                newact: accountName,
                 owner: {
                     threshold: 1,
                     keys: [{
@@ -337,8 +431,8 @@ class Launcher {
             data: {
                 from: 'eosio',
                 receiver: accountName,
-                stake_net_quantity: acct.netStake.toFixed(4) + ' TLOS',
-                stake_cpu_quantity: acct.cpuStake.toFixed(4) + ' TLOS',
+                stake_net_quantity: `${acct.netStake.toFixed(4)} ${tokenSymbol}`,
+                stake_cpu_quantity: `${acct.cpuStake.toFixed(4)} ${tokenSymbol}`,
                 transfer: true,
             }
         }, {
@@ -351,33 +445,80 @@ class Launcher {
             data: {
                 from: 'eosio',
                 to: accountName,
-                quantity: acct.liquid.toFixed(4) + ' TLOS',
-                memo: memo ? memo : 'TLOS Genesis'
+                quantity: `${acct.liquid.toFixed(4)} ${tokenSymbol}`,
+                memo: memo ? memo : `${tokenSymbol} Genesis`
             }
         }];
     }
 
     async createSystemAccount(accountName) {
-        console.log('creating account ' + accountName);
-        await this.runTeclos('create account eosio ' + accountName + ' ' + opts.eosioPub);
+        this.log('creating system account ' + accountName);
+        return this.sendActions([{
+            account: 'eosio',
+            name: 'newaccount',
+            authorization: [{
+                actor: 'eosio',
+                permission: 'active',
+            }],
+            data: {
+                creator: 'eosio',
+                name: accountName,
+                owner: {
+                    threshold: 1,
+                    keys: [],
+                    accounts: [{
+                        permission: {
+                            actor: "eosio",
+                            permission: "active"
+                        },
+                        weight: 1
+                    }],
+                    waits: []
+                },
+                active: {
+                    threshold: 1,
+                    keys: [],
+                    accounts: [{
+                        permission: {
+                            actor: "eosio",
+                            permission: "active"
+                        },
+                        weight: 1
+                    }],
+                    waits: []
+                },
+            },
+        }]);
     }
 
     async pushContract(name) {
-        let contractDir = this.contractsDir + '/build/' + name;
+        await this.unlockWallet();
+        let contractDir = `${this.contractsDir}/build/${name}`;
         //let wasm = contractDir + name + '.wasm';
         //let abi = contractDir + name + '.abi';
-        await this.runTeclos('set contract ' + contracts[name] + ' ' + contractDir);
+        await this.runTeclos(`set contract ${contracts[name]} ${contractDir}`);
+    }
+
+    async unlockWallet() {
+        try {
+            await this.runTeclos(`wallet unlock -n ${walletName} --password ${walletPassword}`);
+        } catch (e) {
+            // If it's already unlocked then it'll throw an error, no big deal, let's not break over it
+        }
     }
 
     async runTeclos(command) {
         const {stdout, stderr} = await exec(this.teclos + ' ' + command);
-        console.log('Result of "' + command + '":\n' + stdout + '\n');
+        this.log(`Result of "${command}":\n ${stdout}\n`);
     }
 
     forcePrecision(val) {
         return parseFloat(parseFloat(val, 10).toFixed(4), 10);
     }
 
+    log(message) {
+        console.log(`${new Date().toISOString().slice(0, 19).replace("T", " ")} ${message}`);
+    }
 }
 
 module.exports = Launcher;
