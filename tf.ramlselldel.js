@@ -1,0 +1,36 @@
+module.exports = {
+  "threshold":5,
+  "keys":[],
+  "accounts":
+  [
+    {
+      "permission":
+      {
+        "actor":"tframlsella","permission":"active"
+      },
+      "weight":1
+    },
+    {
+      "permission":
+      {
+        "actor":"tframlsellb","permission":"active"
+      },
+      "weight":1
+    },
+    {
+      "permission":
+      {
+        "actor":"tframlsellc","permission":"active"
+      },
+      "weight":1
+    },
+    {
+      "permission":
+      {
+        "actor":"tframlsellz","permission":"active"
+      },
+      "weight":4
+    }
+  ],
+  "waits":[]
+};
