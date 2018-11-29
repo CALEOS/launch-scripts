@@ -8,8 +8,20 @@ const readline = require('readline');
 const fetch = require('node-fetch');
 const Throttle = require('promise-parallel-throttle');
 const {TextDecoder, TextEncoder} = require('text-encoding');
-const SnapshotHandler = require('./SnapshotHandler');
 const opts = require('./opts.js');
+
+const ramAccounts = require('./ramAccounts');
+const ramLaunchAccount = 'tf.ramlaunch';
+const ramAdminAccount = 'tf.ramadmin';
+const sellram = require('./sellram');
+const tfRamadminRamdir = require('./tf.ramadmin.ramdir');
+const tfActiveOwner = require('./tf.account.ao');
+const ramAdminActive = require('./tf.ramadmin.active');
+const ramAdminOwner = require('./tf.ramadmin.owner');
+const ramLaunchActiveOwner = require('./tf.ramlaunch.ao');
+const ramLaunchSellDel = require('./tf.ramlselldel');
+const ramLaunchTransfer = require('./tf.ramltrns');
+
 const endpoint = 'http://localhost:' + opts.apiPort;
 
 const genesisMemo = 'Genesis';
@@ -18,8 +30,6 @@ const tokenSymbol = 'TLOS';
 const maxSupply = '10000000000.0000';
 const actionsPerTransaction = 600;
 const injectionThreadCount = 1;
-const walletName = 'genesis';
-const walletPassword = '';
 const maxTrxCpu = 4294967194;
 const maxBlockCpu = 4294967295;
 
@@ -73,24 +83,49 @@ const eosioAccounts = [
 
 // contractDir: accountName
 const contracts = {
-    'eosio.system': 'eosio',
-    'eosio.token': 'eosio.token',
-    'eosio.msig': 'eosio.msig',
-    'eosio.trail': 'eosio.trail',
     'eosio.amend': 'eosio.amend',
-    'eosio.saving': 'eosio.saving',
-    'eosio.wrap': 'eosio.wrap'
+    'eosio.arbitration': 'eosio.arb',
+    'eosio.token': 'eosio.token',
+    'eosio.trail': 'eosio.trail',
+    'eosio.wrap': 'eosio.wrap',
+    'eosio.msig': 'eosio.msig',
+    'eosio.system': 'eosio',
+    'eosio.wps': 'eosio.saving'
 };
 
 class Launcher {
 
     constructor() {
-        this.eosjs = require('eosjs');
+        this.eosjs = eosjs;
         this.jsonrpc = new this.eosjs.JsonRpc(endpoint, {fetch});
         this.contractsDir = opts.contractsDir.replace(/\/$/, '');
         this.teclos = opts.teclos + ' -u http://127.0.0.1:' + opts.apiPort;
         this.sigProvider = new this.eosjs.JsSignatureProvider([opts.eosioPrivate]);
         this.loadApi();
+    }
+
+    async launch() {
+        this.log('Launch beginning...');
+        await this.createEosioAccounts();
+        await this.createAndIssueTokens();
+        await this.pushContract('eosio.msig');
+        //await this.setMsigPriv();
+        await this.pushContract('eosio.amend');
+        await this.setCodePermission(contracts['eosio.amend']);
+        //await this.pushContract('eosio.saving');
+        await this.setCodePermission(contracts['eosio.saving']);
+        await this.pushContract('eosio.wrap');
+        await this.pushContract('eosio.system');
+        this.loadApi();
+        await this.initSystem();
+        await this.ramSetup();
+        //await this.injectGenesis();
+
+        // DO THIS LAST!!!
+        await this.pushContract('eosio.trail');
+        await this.setCodePermission(contracts['eosio.trail']);
+        //await this.regBallot();
+        this.log('Launch complete!');
     }
 
     loadApi() {
@@ -115,28 +150,6 @@ class Launcher {
         await new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    async launch() {
-        this.log('Launch beginning...');
-        await this.createEosioAccounts();
-        await this.createAndIssueTokens();
-        await this.pushContract('eosio.msig');
-        //await this.setMsigPriv();
-        await this.pushContract('eosio.amend');
-        await this.setCodePermission(contracts['eosio.amend']);
-        //await this.pushContract('eosio.saving');
-        await this.setCodePermission(contracts['eosio.saving']);
-        await this.pushContract('eosio.wrap');
-        await this.pushContract('eosio.system');
-        this.loadApi();
-        await this.initSystem();
-        await this.injectGenesis();
-
-        // DO THIS LAST!!!
-        await this.pushContract('eosio.trail');
-        await this.setCodePermission(contracts['eosio.trail']);
-        //await this.regBallot();
-        this.log('Launch complete!');
-    }
 
     async setGlobals(highCpu) {
         this.log(`Setting globals to ${highCpu ? 'high' : 'low'} cpu`);
@@ -178,6 +191,17 @@ class Launcher {
         ]);
     }
 
+    async createAccount(name, pubKey, ramBytes, cpu, net, transfer, memo) {
+        return this.sendActions(this.getAccountActions({
+            accountName: name,
+            pubKey: pubKey,
+            ramBytes: ramBytes,
+            cpuStake: cpu,
+            netStake: net,
+            liquid: transfer
+        }, memo));
+    }
+
     async createEosioAccounts() {
         this.log('Creating eosio accounts...');
         let promises = [];
@@ -189,33 +213,102 @@ class Launcher {
     }
 
     async setCodePermission(accountName) {
+        return this.setAccountPermission(accountName, 'active', 'active', 'owner', {
+            "threshold": 1,
+            "keys": [],
+            "waits": [],
+            "accounts": [{
+                "permission": {"actor": "eosio", "permission": "active"},
+                "weight": 1
+            }, {
+                "permission": {"actor": accountName, "permission": "eosio.code"},
+                "weight": 1
+            }]
+        });
+    }
+
+    async setAccountPermission(accountName, accountPermission, targetPermission, parent, auth) {
         return this.sendActions([
             {
                 account: 'eosio',
                 name: 'updateauth',
                 authorization: [{
                     actor: accountName,
-                    permission: 'active',
+                    permission: accountPermission,
                 }],
                 data: {
                     account: accountName,
-                    permission: 'active',
-                    parent: 'owner',
-                    auth: {
-                        "threshold": 1,
-                        "keys": [],
-                        "waits": [],
-                        "accounts": [{
-                            "permission": {"actor": "eosio", "permission": "active"},
-                            "weight": 1
-                        }, {
-                            "permission": {"actor": accountName, "permission": "eosio.code"},
-                            "weight": 1
-                        }]
-                    }
+                    permission: targetPermission,
+                    parent: parent,
+                    auth: auth
                 }
             }
-        ])
+        ]);
+    }
+
+    async ramSetup() {
+        await this.createRamAccounts();
+        await this.setupRamPermissions();
+
+    }
+
+    async createRamAccounts() {
+        Object.keys(ramAccounts).forEach(async accountName => {
+            this.log(`Creating ram account ${accountName} with pubkey ${ramAccounts[accountName]}`);
+            await this.createAccount(accountName, ramAccounts[accountName], 4096, 1, 1, 0, 0);
+        });
+    }
+
+    async setupRamPermissions() {
+        await this.setRamLaunchPermissions();
+        await this.setRamAdminPermissions();
+    }
+
+    async setRamLaunchPermissions() {
+        await this.setAccountPermission(ramLaunchAccount, 'active', 'transfer', 'active', ramLaunchTransfer);
+        await this.setAccountPermission(ramLaunchAccount, 'active', 'selldel', 'active', ramLaunchSellDel);
+        await this.setActionPermission(ramLaunchAccount, 'active', ramLaunchAccount, 'eosio.token', 'transfer', 'transfer');
+        await this.setActionPermission(ramLaunchAccount, 'active', ramLaunchAccount, 'eosio', 'delegatebw', 'selldel');
+        await this.setActionPermission(ramLaunchAccount, 'active', ramLaunchAccount, 'eosio', 'undelegatebw', 'selldel');
+        await this.setActionPermission(ramLaunchAccount, 'active', ramLaunchAccount, 'eosio', 'sellram', 'selldel');
+        await this.setAccountPermission(ramLaunchAccount, 'owner', 'active', 'owner', ramLaunchActiveOwner);
+        await this.setAccountPermission(ramLaunchAccount, 'owner', 'owner', 'owner', ramLaunchActiveOwner);
+    }
+
+    async setRamAdminPermissions() {
+        await this.setAccountPermission(ramAdminAccount, 'active', 'ramdir', 'active', tfRamadminRamdir);
+        await this.setActionPermission(ramAdminAccount, 'active', ramAdminAccount, 'eosio', 'delegatebw', 'ramdir');
+        await this.setActionPermission(ramAdminAccount, 'active', ramAdminAccount, 'eosio', 'undelegatebw', 'ramdir');
+        await this.setActionPermission(ramAdminAccount, 'active', ramAdminAccount, 'eosio', 'buyram', 'ramdir');
+        await this.setActionPermission(ramAdminAccount, 'active', ramAdminAccount, 'eosio', 'sellram', 'ramdir');
+        await this.setAccountPermission(ramAdminAccount, 'owner', 'active', 'owner', ramAdminActive);
+        await this.setAccountPermission(ramAdminAccount, 'owner', 'owner', 'owner', ramAdminOwner);
+    }
+
+
+    /*
+         [[eosio::action]]
+         void linkauth(  ignore<name>    account, - account who needs the permission ignore<name>    code, - contract account
+                         ignore<name>    type, - action name
+                         ignore<name>    requirement  - name of new permission
+    */
+    async setActionPermission(authAccount, authPermission, targetAccount, actionContract, actionName, newPermission) {
+        return this.sendActions([
+            {
+                account: 'eosio',
+                name: 'linkauth',
+                authorization: [{
+                    actor: authAccount,
+                    permission: authPermission
+                }],
+                data: {
+                    account: targetAccount,
+                    code: actionContract,
+                    type: actionName,
+                    requirement: newPermission
+                }
+            }
+        ]);
     }
 
     async injectGenesis() {
@@ -231,10 +324,7 @@ class Launcher {
         this.accountInjectionCount = 0;
         let actions = [];
         let actionChunks = [];
-        for (let accountName in accounts) {
-            if (!accounts.hasOwnProperty((accountName)))
-                continue;
-
+        Object.keys(accounts).forEach(accountName => {
             this.accountInjectionCount++;
 
             if (this.accountInjectionCount % 10000 === 0)
@@ -246,7 +336,7 @@ class Launcher {
                 actionChunks.push(actions);
                 actions = [];
             }
-        }
+        });
 
         let thisLauncher = this;
 
@@ -322,7 +412,8 @@ class Launcher {
                     accountName: accountName,
                     pubKey: pubKey,
                     cpuStake: cpuStake,
-                    netStake: netStake
+                    netStake: netStake,
+                    ramBytes: 4096
                 };
             });
 
@@ -378,7 +469,7 @@ class Launcher {
                 maximum_supply: `${maxSupply} ${tokenSymbol}`
             }
         }];
-        for (let memo in tokenIssuances) {
+        Object.keys(tokenIssuances).forEach(memo => {
             actions.push({
                 account: 'eosio.token',
                 name: 'issue',
@@ -392,7 +483,7 @@ class Launcher {
                     memo: memo
                 }
             });
-        }
+        });
 
         await this.sendActions(actions);
     }
@@ -420,7 +511,7 @@ class Launcher {
 
     getAccountActions(acct, memo) {
         let accountName = acct.accountName;
-        return [{
+        let actions = [{
             account: 'eosio',
             name: 'newaccount',
             authorization: [{
@@ -459,7 +550,7 @@ class Launcher {
             data: {
                 payer: 'eosio',
                 receiver: accountName,
-                bytes: 4096,
+                bytes: act.ramBytes,
             },
         }, {
             account: 'eosio',
@@ -475,20 +566,23 @@ class Launcher {
                 stake_cpu_quantity: `${acct.cpuStake.toFixed(4)} ${tokenSymbol}`,
                 transfer: true,
             }
-        }, {
-            account: 'eosio.token',
-            name: 'transfer',
-            authorization: [{
-                actor: 'eosio',
-                permission: 'active',
-            }],
-            data: {
-                from: 'eosio',
-                to: accountName,
-                quantity: `${acct.liquid.toFixed(4)} ${tokenSymbol}`,
-                memo: memo ? memo : `${tokenSymbol} Genesis`
-            }
         }];
+
+        if (acct.liquid)
+            actions.push({
+                account: 'eosio.token',
+                name: 'transfer',
+                authorization: [{
+                    actor: 'eosio',
+                    permission: 'active',
+                }],
+                data: {
+                    from: 'eosio',
+                    to: accountName,
+                    quantity: `${acct.liquid.toFixed(4)} ${tokenSymbol}`,
+                    memo: memo ? memo : `${tokenSymbol} Genesis`
+                }
+            });
     }
 
     async createSystemAccount(accountName) {
@@ -541,7 +635,7 @@ class Launcher {
 
     async unlockWallet() {
         try {
-            await this.runTeclos(`wallet unlock -n ${walletName} --password ${walletPassword}`);
+            await this.runTeclos(`wallet unlock -n ${opts.walletName} --password ${opts.walletPassword}`);
         } catch (e) {
             // If it's already unlocked then it'll throw an error, no big deal, let's not break over it
         }

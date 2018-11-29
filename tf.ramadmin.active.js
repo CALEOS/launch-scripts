@@ -1,0 +1,29 @@
+module.exports = {
+  "threshold":2,
+  "keys":[],
+  "accounts":
+  [
+    {
+      "permission":
+      {
+        "actor":"tframactiva","permission":"active"
+      },
+      "weight":1
+    },
+    {
+      "permission":
+      {
+        "actor":"tframactivb","permission":"active"
+      },
+      "weight":1
+    },
+    {
+      "permission":
+      {
+        "actor":"tframactivc","permission":"active"
+      },
+      "weight":1
+    },
+  ],
+  "waits": []
+};
