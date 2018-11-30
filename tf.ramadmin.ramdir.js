@@ -9,5 +9,6 @@ module.exports = {
             },
             "weight": 1
         }
-    ]
+    ],
+    "waits": []
 };

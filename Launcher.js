@@ -85,12 +85,12 @@ const eosioAccounts = [
 const contracts = {
     'eosio.amend': 'eosio.amend',
     'eosio.arbitration': 'eosio.arb',
+    'eosio.msig': 'eosio.msig',
+    'eosio.wps': 'eosio.saving',
+    'eosio.system': 'eosio',
     'eosio.token': 'eosio.token',
     'eosio.trail': 'eosio.trail',
-    'eosio.wrap': 'eosio.wrap',
-    'eosio.msig': 'eosio.msig',
-    'eosio.system': 'eosio',
-    'eosio.wps': 'eosio.saving'
+    'eosio.wrap': 'eosio.wrap'
 };
 
 class Launcher {
@@ -113,18 +113,22 @@ class Launcher {
         await this.pushContract('eosio.amend');
         await this.setCodePermission(contracts['eosio.amend']);
         //await this.pushContract('eosio.saving');
-        await this.setCodePermission(contracts['eosio.saving']);
+        //await this.setCodePermission(contracts['eosio.saving']);
         await this.pushContract('eosio.wrap');
         await this.pushContract('eosio.system');
         this.loadApi();
         await this.initSystem();
+        this.loadApi();
         await this.ramSetup();
+
+        // TODO: uncomment this!!
         //await this.injectGenesis();
 
         // DO THIS LAST!!!
         await this.pushContract('eosio.trail');
         await this.setCodePermission(contracts['eosio.trail']);
         //await this.regBallot();
+        await this.pushContract('eosio.arbitration');
         this.log('Launch complete!');
     }
 
@@ -228,6 +232,7 @@ class Launcher {
     }
 
     async setAccountPermission(accountName, accountPermission, targetPermission, parent, auth) {
+        this.log(`Setting ${targetPermission} permission for ${accountName}`);
         return this.sendActions([
             {
                 account: 'eosio',
@@ -249,7 +254,6 @@ class Launcher {
     async ramSetup() {
         await this.createRamAccounts();
         await this.setupRamPermissions();
-
     }
 
     async createRamAccounts() {
@@ -257,9 +261,13 @@ class Launcher {
             this.log(`Creating ram account ${accountName} with pubkey ${ramAccounts[accountName]}`);
             await this.createAccount(accountName, ramAccounts[accountName], 4096, 1, 1, 0, 0);
         });
+        this.log(`Creating ${ramAdminAccount} and ${ramLaunchAccount}`);
+        await this.createAccount(ramAdminAccount, opts.eosioPub, 4096, 1, 1, 0, 0);
+        await this.createAccount(ramLaunchAccount, opts.eosioPub, 4096, 1, 1, 0, 0);
     }
 
     async setupRamPermissions() {
+        this.log('Setting up ram permissions...');
         await this.setRamLaunchPermissions();
         await this.setRamAdminPermissions();
     }
@@ -272,7 +280,7 @@ class Launcher {
         await this.setActionPermission(ramLaunchAccount, 'active', ramLaunchAccount, 'eosio', 'undelegatebw', 'selldel');
         await this.setActionPermission(ramLaunchAccount, 'active', ramLaunchAccount, 'eosio', 'sellram', 'selldel');
         await this.setAccountPermission(ramLaunchAccount, 'owner', 'active', 'owner', ramLaunchActiveOwner);
-        await this.setAccountPermission(ramLaunchAccount, 'owner', 'owner', 'owner', ramLaunchActiveOwner);
+        await this.setAccountPermission(ramLaunchAccount, 'owner', 'owner', '', ramLaunchActiveOwner);
     }
 
     async setRamAdminPermissions() {
@@ -282,7 +290,7 @@ class Launcher {
         await this.setActionPermission(ramAdminAccount, 'active', ramAdminAccount, 'eosio', 'buyram', 'ramdir');
         await this.setActionPermission(ramAdminAccount, 'active', ramAdminAccount, 'eosio', 'sellram', 'ramdir');
         await this.setAccountPermission(ramAdminAccount, 'owner', 'active', 'owner', ramAdminActive);
-        await this.setAccountPermission(ramAdminAccount, 'owner', 'owner', 'owner', ramAdminOwner);
+        await this.setAccountPermission(ramAdminAccount, 'owner', 'owner', '', ramAdminOwner);
     }
 
 
@@ -550,7 +558,7 @@ class Launcher {
             data: {
                 payer: 'eosio',
                 receiver: accountName,
-                bytes: act.ramBytes,
+                bytes: acct.ramBytes,
             },
         }, {
             account: 'eosio',
@@ -583,6 +591,8 @@ class Launcher {
                     memo: memo ? memo : `${tokenSymbol} Genesis`
                 }
             });
+
+        return actions;
     }
 
     async createSystemAccount(accountName) {
