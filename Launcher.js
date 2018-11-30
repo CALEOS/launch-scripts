@@ -33,6 +33,7 @@ const injectionThreadCount = 1;
 const maxTrxCpu = 4294967194;
 const maxBlockCpu = 4294967295;
 
+// TODO: make sure these values are the final values we want (cpu values are currently at max)
 const globalValues = {
     "max_transaction_delay": 3888000,
     "min_transaction_cpu_usage": 100,
@@ -109,16 +110,19 @@ class Launcher {
         await this.createEosioAccounts();
         await this.createAndIssueTokens();
         await this.pushContract('eosio.msig');
+
+        // TODO: figure out wen to run this
         //await this.setMsigPriv();
         await this.pushContract('eosio.amend');
         await this.setCodePermission(contracts['eosio.amend']);
+
+        // TODO: get the wps contract and deploy it!!
         //await this.pushContract('eosio.saving');
         //await this.setCodePermission(contracts['eosio.saving']);
         await this.pushContract('eosio.wrap');
         await this.pushContract('eosio.system');
         this.loadApi();
         await this.initSystem();
-        this.loadApi();
         await this.ramSetup();
 
         // TODO: uncomment this!!
@@ -127,8 +131,12 @@ class Launcher {
         // DO THIS LAST!!!
         await this.pushContract('eosio.trail');
         await this.setCodePermission(contracts['eosio.trail']);
+
+        // TODO: figure out when we can run this
         //await this.regBallot();
         await this.pushContract('eosio.arbitration');
+
+        // TODO: enable eosio.prods?
         this.log('Launch complete!');
     }
 
