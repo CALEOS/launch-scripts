@@ -128,6 +128,11 @@ class Launcher {
         // TODO: uncomment this!!
         //await this.injectGenesis();
 
+        // TODO: inject BPs
+        // TODO: inject/distribute community rewards
+        // TODO: inject/distribute TFRP
+        // TODO: inject TF board accounts (is this a thing?)
+
         // DO THIS LAST!!!
         await this.pushContract('eosio.trail');
         await this.setCodePermission(contracts['eosio.trail']);
