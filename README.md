@@ -1,5 +1,22 @@
 # launch-scripts
 
+## Launcher.js
+- To run it, you need to require it and then call `new Launcher().launch()` which you can see an example of in test.js
+- You'll also need to setup an opts.js file that looks like this
+```
+module.exports = {
+    eosioPub: "EOSpubkey",
+    eosioPrivate: "privatekey",
+    apiPort: "8888",
+    contractsDir: "/Users/jesse/telos/repos/eosio.contracts",
+    teclos: "/Users/jesse/telos/repos/telos/build/programs/teclos/teclos",
+    walletName: 'genesis',
+    walletPassword: 'password-to-wallet'
+};
+```
+
+
+
 - For the ParseSnapshot.js file, you'll need a recent version of nodejs (latest ubuntu doesn't come with the latest nodejs by default)
 - And then in the same directory as you'll run the script from, you'll want a file named snapshot.csv, without a header line
 - In that same directory you'll also want to run `npm install readline eosjs@beta node-fetch text-encoding promise-parallel-throttle single-line-log argparse`
