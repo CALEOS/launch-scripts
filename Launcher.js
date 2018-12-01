@@ -288,7 +288,7 @@ class Launcher {
 
     async createBPAccounts() {
         this.log('Creating Telos BP Accounts');
-        let telosBPAccounts = await this.getSnapshotMap(telosBPAccountsSnapshot, 1, 2);
+        let telosBPAccounts = await this.getSnapshotMap(telosBPAccountsSnapshot, 2, 3);
 
         Object.keys(telosBPAccounts).forEach(async accountName => {
             this.log(`Creating Telos BP account ${accountName} with pubkey ${telosBPAccounts[accountName]}`);
