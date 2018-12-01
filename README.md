@@ -1,6 +1,7 @@
 # launch-scripts
 
 ## Launcher.js
+- From the root of this repo you can just run `npm install`
 - To run it, you need to require it and then call `new Launcher().launch()` which you can see an example of in test.js
 - You'll also need to setup an opts.js file that looks like this
 ```
