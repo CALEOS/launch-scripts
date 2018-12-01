@@ -1,5 +1,6 @@
 'use strict';
 
+const request = require('request');
 const eosjs = require('eosjs');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
@@ -10,12 +11,21 @@ const Throttle = require('promise-parallel-throttle');
 const {TextDecoder, TextEncoder} = require('text-encoding');
 const opts = require('./opts.js');
 
-const ramAccounts = require('./ramAccounts');
-const ramLaunchAccount = 'tf.ramlaunch';
+const ramAccountsSnapshot = 'ram_accounts.csv';
+const telosBPAccountsSnapshot = 'initial_block_producers.csv';
+
 const ramAdminAccount = 'tf.ramadmin';
+const ramAdminLiquid = '40000.0000';
+const ramAdminMemo = 'RAM Administrator';
+
+const ramLaunchAccount = 'tf.ramlaunch';
+const ramLaunchLiquid = '280000.0000';
+const ramLaunchMemo = 'RAM Launch';
+
 const sellram = require('./sellram');
 const tfRamadminRamdir = require('./tf.ramadmin.ramdir');
 const tfActiveOwner = require('./tf.account.ao');
+const tfSubAccountsActiveOwner = require('./tf.subaccounts.ao');
 const ramAdminActive = require('./tf.ramadmin.active');
 const ramAdminOwner = require('./tf.ramadmin.owner');
 const ramLaunchActiveOwner = require('./tf.ramlaunch.ao');
@@ -24,7 +34,9 @@ const ramLaunchTransfer = require('./tf.ramltrns');
 
 const endpoint = 'http://localhost:' + opts.apiPort;
 
+const snapshotSha = 'master';
 const genesisMemo = 'Genesis';
+const tfAccountMemo = 'Telos Foundation';
 const initVersion = 0;
 const tokenSymbol = 'TLOS';
 const maxSupply = '10000000000.0000';
@@ -57,11 +69,18 @@ const globalValues = {
 
 const tokenIssuances = {
     'Genesis Snapshot': '178473249.3125',
+    'Telos Foundation Issue': '6000000.0000',
     'Telos Founders Reward Pool Issue': '18000000.0000',
     'Telos Community Reward Pool Issue': '1000000.0000',
-    'Telos Foundation Issue': '6000000.0000',
     'Exchange Pool': '140279973.0000',
     'Genesis Account RAM Issue': '25000.0000'
+};
+
+const tfAccounts = {
+    'tf': '6000000.0000',
+    'tf.frp': '18000000.0000',
+    'tf.crp': '1000000.0000',
+    'tf.exrsrv': '140279973.0000'
 };
 
 const eosioAccounts = [
@@ -91,7 +110,8 @@ const contracts = {
     'eosio.system': 'eosio',
     'eosio.token': 'eosio.token',
     'eosio.trail': 'eosio.trail',
-    'eosio.wrap': 'eosio.wrap'
+    'eosio.wrap': 'eosio.wrap',
+    'tfvt': 'tf'
 };
 
 class Launcher {
@@ -123,15 +143,28 @@ class Launcher {
         await this.pushContract('eosio.system');
         this.loadApi();
         await this.initSystem();
+
+        // This has to happen before TF accounts, the ABP accounts need to exist before the tf account permission can be set
+        await this.createBPAccounts();
+
+        await this.createTfAccounts();
+        // TODO: this once it's ready
+        //await this.pushContract('tfvt');
+
+        // TODO: inject/distribute TFRP
+        // TODO: inject/distribute community rewards
+        // TODO: inject TF board accounts (is this a thing?)
+
+        // END OF TF STUFFS
+        // now that we've done everything we need to do with the tf accounts... set their permissions
+        await this.setTfAccountPermissions();
+
         await this.ramSetup();
 
         // TODO: uncomment this!!
         //await this.injectGenesis();
 
         // TODO: inject BPs
-        // TODO: inject/distribute community rewards
-        // TODO: inject/distribute TFRP
-        // TODO: inject TF board accounts (is this a thing?)
 
         // DO THIS LAST!!!
         await this.pushContract('eosio.trail');
@@ -167,6 +200,51 @@ class Launcher {
         await new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    async getSnapshotMap(fileName, accountIndex, keyIndex) {
+        let contents = await this.getSnapshot(fileName);
+        let snapMap = {};
+
+        let firstLine = true;
+        contents.split('\n').forEach(line => {
+            if (firstLine) {
+                firstLine = false;
+                return;
+            }
+            let lineParts = line.split(',');
+            if (lineParts.length < 4)
+                return;
+
+            let accountName = lineParts[accountIndex].trim();
+            let pubKey = lineParts[keyIndex].trim();
+
+            if (!accountName || ! pubKey) {
+                this.log(`getSnapshotMap skipping line because it's missing name/key: ${line}`);
+                return;
+            }
+
+            snapMap[accountName] = pubKey;
+        });
+
+        return snapMap;
+    }
+
+    async getSnapshot(fileName) {
+        return this.httpGet(`https://raw.githubusercontent.com/Telos-Foundation/snapshots/${snapshotSha}/${fileName}`);
+    }
+
+    async httpGet(url) {
+        this.log(`Getting url ${url}`);
+        return new Promise((resolve, reject) => {
+            request(url, (error, response, body) => {
+                if (error) {
+                    this.log(`Failed to get ${url}, got ${response && response.statusCode || -1} code and error: ${error}`);
+                    reject(error);
+                }
+
+                resolve(body);
+            });
+        });
+    }
 
     async setGlobals(highCpu) {
         this.log(`Setting globals to ${highCpu ? 'high' : 'low'} cpu`);
@@ -206,6 +284,73 @@ class Launcher {
                 }
             }
         ]);
+    }
+
+    async createBPAccounts() {
+        this.log('Creating Telos BP Accounts');
+        let telosBPAccounts = await this.getSnapshotMap(telosBPAccountsSnapshot, 1, 2);
+
+        Object.keys(telosBPAccounts).forEach(async accountName => {
+            this.log(`Creating Telos BP account ${accountName} with pubkey ${telosBPAccounts[accountName]}`);
+            await this.createAccount(accountName, telosBPAccounts[accountName], 4096, 1, 1, 0, 'Genesis BP');
+        });
+    }
+
+    async createTfAccounts() {
+        Object.keys(tfAccounts).forEach(async accountName => {
+            await this.createAccount(accountName, opts.eosioPub, 4096, 8, 2, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
+        });
+
+        this.log(`Creating ${ramAdminAccount} and ${ramLaunchAccount}`);
+        await this.createAccount(ramAdminAccount, opts.eosioPub, 4096, 1, 1, 0, 0);
+        await this.createAccount(ramLaunchAccount, opts.eosioPub, 4096, 1, 1, 0, 0);
+        this.log(`Transfering to  ${ramAdminAccount} and ${ramLaunchAccount}`);
+        await this.sendActions([
+            {
+                account: 'eosio.token',
+                name: 'transfer',
+                authorization: [{
+                    actor: 'tf',
+                    permission: 'active',
+                }],
+                data: {
+                    from: 'tf',
+                    to: ramAdminAccount,
+                    quantity: `${ramAdminLiquid} ${tokenSymbol}`,
+                    memo: ramAdminMemo
+                }
+            },
+            {
+                account: 'eosio.token',
+                name: 'transfer',
+                authorization: [{
+                    actor: 'tf',
+                    permission: 'active',
+                }],
+                data: {
+                    from: 'tf',
+                    to: ramLaunchAccount,
+                    quantity: `${ramLaunchLiquid} ${tokenSymbol}`,
+                    memo: ramLaunchMemo
+                }
+            }
+        ]);
+    }
+
+    async setTfAccountPermissions() {
+        this.log('Setting permissions for tf accounts');
+        await this.setAccountPermission('tf', 'owner', 'active', 'owner', tfActiveOwner);
+        await this.setAccountPermission('tf', 'owner', 'owner', '', tfActiveOwner);
+
+        await this.setAccountPermission('tf.frp', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
+        await this.setAccountPermission('tf.frp', 'owner', 'owner', '', tfSubAccountsActiveOwner);
+
+        await this.setAccountPermission('tf.crp', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
+        await this.setAccountPermission('tf.crp', 'owner', 'owner', '', tfSubAccountsActiveOwner);
+
+        // TODO: Does exrsrv control go to prods or tf?
+        await this.setAccountPermission('tf.exrsrv', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
+        await this.setAccountPermission('tf.exrsrv', 'owner', 'owner', '', tfSubAccountsActiveOwner);
     }
 
     async createAccount(name, pubKey, ramBytes, cpu, net, transfer, memo) {
@@ -270,13 +415,12 @@ class Launcher {
     }
 
     async createRamAccounts() {
+        let ramAccounts = await this.getSnapshotMap(ramAccountsSnapshot, 2, 3);
+
         Object.keys(ramAccounts).forEach(async accountName => {
             this.log(`Creating ram account ${accountName} with pubkey ${ramAccounts[accountName]}`);
             await this.createAccount(accountName, ramAccounts[accountName], 4096, 1, 1, 0, 0);
         });
-        this.log(`Creating ${ramAdminAccount} and ${ramLaunchAccount}`);
-        await this.createAccount(ramAdminAccount, opts.eosioPub, 4096, 1, 1, 0, 0);
-        await this.createAccount(ramLaunchAccount, opts.eosioPub, 4096, 1, 1, 0, 0);
     }
 
     async setupRamPermissions() {

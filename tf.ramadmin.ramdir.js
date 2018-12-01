@@ -4,7 +4,7 @@ module.exports = {
     "accounts": [
         {
             "permission": {
-                "actor": "tframtradez",
+                "actor": "tframtradezz",
                 "permission": "active"
             },
             "weight": 1

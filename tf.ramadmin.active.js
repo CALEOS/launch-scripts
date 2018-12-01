@@ -6,21 +6,21 @@ module.exports = {
     {
       "permission":
       {
-        "actor":"tframactiva","permission":"active"
+        "actor":"tframactivea","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframactivb","permission":"active"
+        "actor":"tframactiveb","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframactivc","permission":"active"
+        "actor":"tframactivec","permission":"active"
       },
       "weight":1
     },

@@ -6,63 +6,63 @@ module.exports = {
     {
       "permission":
       {
-        "actor":"tframlownra","permission":"active"
+        "actor":"tframlownraa","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlownrb","permission":"active"
+        "actor":"tframlownrbb","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlownrc","permission":"active"
+        "actor":"tframlownrcc","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlownrd","permission":"active"
+        "actor":"tframlownrdd","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlownre","permission":"active"
+        "actor":"tframlownree","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlownrf","permission":"active"
+        "actor":"tframlownrff","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlownrg","permission":"active"
+        "actor":"tframlownrgg","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlownrh","permission":"active"
+        "actor":"tframlownrhh","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlownri","permission":"active"
+        "actor":"tframlownrii","permission":"active"
       },
       "weight":1
     }
