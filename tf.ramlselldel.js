@@ -6,28 +6,28 @@ module.exports = {
     {
       "permission":
       {
-        "actor":"tframlsella","permission":"active"
+        "actor":"tframlsellaa","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlsellb","permission":"active"
+        "actor":"tframlsellbb","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlsellc","permission":"active"
+        "actor":"tframlsellcc","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframlsellz","permission":"active"
+        "actor":"tframlsellzz","permission":"active"
       },
       "weight":4
     }

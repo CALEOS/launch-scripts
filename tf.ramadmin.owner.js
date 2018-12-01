@@ -6,63 +6,63 @@ module.exports = {
     {
       "permission":
       {
-        "actor":"tframownera","permission":"active"
+        "actor":"tframowneraa","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframownerb","permission":"active"
+        "actor":"tframownerbb","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframownerc","permission":"active"
+        "actor":"tframownercc","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframownerd","permission":"active"
+        "actor":"tframownerdd","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframownere","permission":"active"
+        "actor":"tframowneree","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframownerf","permission":"active"
+        "actor":"tframownerff","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframownerg","permission":"active"
+        "actor":"tframownergg","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframownerh","permission":"active"
+        "actor":"tframownerhh","permission":"active"
       },
       "weight":1
     },
     {
       "permission":
       {
-        "actor":"tframowneri","permission":"active"
+        "actor":"tframownerii","permission":"active"
       },
       "weight":1
     }
