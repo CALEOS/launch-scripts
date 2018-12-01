@@ -120,7 +120,7 @@ class Launcher {
         this.eosjs = eosjs;
         this.jsonrpc = new this.eosjs.JsonRpc(endpoint, {fetch});
         this.contractsDir = opts.contractsDir.replace(/\/$/, '');
-        this.teclos = opts.teclos + ' -u http://127.0.0.1:' + opts.apiPort;
+        this.teclos = opts.teclos + ' --wallet-url http://127.0.0.1:8999 -u http://127.0.0.1:' + opts.apiPort;
         this.sigProvider = new this.eosjs.JsSignatureProvider([opts.eosioPrivate]);
         this.loadApi();
     }
@@ -131,8 +131,7 @@ class Launcher {
         await this.createAndIssueTokens();
         await this.pushContract('eosio.msig');
 
-        // TODO: figure out wen to run this
-        //await this.setMsigPriv();
+        // TODO: figure out when to run this
         await this.pushContract('eosio.amend');
         await this.setCodePermission(contracts['eosio.amend']);
 
@@ -143,6 +142,8 @@ class Launcher {
         await this.pushContract('eosio.system');
         this.loadApi();
         await this.initSystem();
+        await this.setMsigPriv();
+        await this.setWrapPriv();
 
         // This has to happen before TF accounts, the ABP accounts need to exist before the tf account permission can be set
         await this.createBPAccounts();
@@ -172,7 +173,9 @@ class Launcher {
 
         // TODO: figure out when we can run this
         //await this.regBallot();
-        await this.pushContract('eosio.arbitration');
+
+        //TODO: push when we actually have it
+        //await this.pushContract('eosio.arbitration');
 
         // TODO: enable eosio.prods?
         this.log('Launch complete!');
@@ -603,6 +606,23 @@ class Launcher {
         ])
     }
 
+    async setWrapPriv() {
+        this.sendActions([
+            {
+                account: 'eosio',
+                name: 'setpriv',
+                authorization: [{
+                    actor: 'eosio',
+                    permission: 'active',
+                }],
+                data: {
+                    account: 'eosio.wrap',
+                    is_priv: 1
+                }
+            }
+        ])
+    }
+
     async regBallot() {
         this.sendActions([
             {
@@ -685,7 +705,7 @@ class Launcher {
             }],
             data: {
                 creator: 'eosio',
-                newact: accountName,
+                name: accountName,
                 owner: {
                     threshold: 1,
                     keys: [{
