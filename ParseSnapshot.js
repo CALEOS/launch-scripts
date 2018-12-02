@@ -1,7 +1,7 @@
 'use strict'
 
 const ArgumentParser = require('argparse').ArgumentParser;
-const Parser = require('./Parser.js');
+const Parser = require('./SnapshotHandler.js');
 
 var argParser = new ArgumentParser({
     version: '1.0.0',
@@ -113,4 +113,4 @@ let opts = {
     debug: args.debug === "true"
 };
 
-(new Parser(opts).parse());
+(new Parser(opts).run());
