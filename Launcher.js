@@ -120,7 +120,7 @@ class Launcher {
         this.eosjs = eosjs;
         this.jsonrpc = new this.eosjs.JsonRpc(endpoint, {fetch});
         this.contractsDir = opts.contractsDir.replace(/\/$/, '');
-        this.teclos = opts.teclos + ' --wallet-url http://127.0.0.1:8999 -u http://127.0.0.1:' + opts.apiPort;
+        this.teclos = opts.teclos + ' -u http://127.0.0.1:' + opts.apiPort;
         this.sigProvider = new this.eosjs.JsSignatureProvider([opts.eosioPrivate]);
         this.loadApi();
     }
@@ -142,6 +142,7 @@ class Launcher {
         await this.pushContract('eosio.system');
         this.loadApi();
         await this.initSystem();
+        //Log output the below actions to output? I couldn't make it happen today
         await this.setMsigPriv();
         await this.setWrapPriv();
 
@@ -154,7 +155,8 @@ class Launcher {
 
         // TODO: inject/distribute TFRP
         // TODO: inject/distribute community rewards
-        // TODO: inject TF board accounts (is this a thing?)
+        // TODO: inject tvt token accounts? I removed board accunts here. We wont have one elected anyway.
+        // TODO: inject key recovery CSV
 
         // END OF TF STUFFS
         // now that we've done everything we need to do with the tf accounts... set their permissions
@@ -415,6 +417,9 @@ class Launcher {
     async ramSetup() {
         await this.createRamAccounts();
         await this.setupRamPermissions();
+        //TODO: Write actions for the below. Ram launch should be purchase in 10x 28000 TLOS chunks due to slipage
+        //await this.buyTframlaunch();
+        //await this.buyTframadmin();
     }
 
     async createRamAccounts() {
