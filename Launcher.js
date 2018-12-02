@@ -21,6 +21,8 @@ const ramAdminMemo = 'RAM Administrator';
 const ramLaunchAccount = 'tf.ramlaunch';
 const ramLaunchLiquid = '280000.0000';
 const ramLaunchMemo = 'RAM Launch';
+const ramLaunchBatchSize = '28000.0000';
+const ramLaunchBatchCount = 10;
 
 const sellram = require('./sellram');
 const tfRamadminRamdir = require('./tf.ramadmin.ramdir');
@@ -131,7 +133,6 @@ class Launcher {
         await this.createAndIssueTokens();
         await this.pushContract('eosio.msig');
 
-        // TODO: figure out when to run this
         await this.pushContract('eosio.amend');
         await this.setCodePermission(contracts['eosio.amend']);
 
@@ -142,7 +143,7 @@ class Launcher {
         await this.pushContract('eosio.system');
         this.loadApi();
         await this.initSystem();
-        //Log output the below actions to output? I couldn't make it happen today
+
         await this.setMsigPriv();
         await this.setWrapPriv();
 
@@ -155,7 +156,7 @@ class Launcher {
 
         // TODO: inject/distribute TFRP
         // TODO: inject/distribute community rewards
-        // TODO: inject tvt token accounts? I removed board accunts here. We wont have one elected anyway.
+        // TODO: inject tvt token accounts? I removed board accounts here. We wont have one elected anyway.
         // TODO: inject key recovery CSV
 
         // END OF TF STUFFS
@@ -167,7 +168,7 @@ class Launcher {
         // TODO: uncomment this!!
         //await this.injectGenesis();
 
-        // TODO: inject BPs
+        // TODO: inject EOS BPs
 
         // DO THIS LAST!!!
         await this.pushContract('eosio.trail');
@@ -416,10 +417,14 @@ class Launcher {
 
     async ramSetup() {
         await this.createRamAccounts();
+
+        // Doing ram buys before setting permissions
+        await this.buyTfRamLaunch();
+
+        //TODO: Write actions for the below, how much do we buy for the ram admin??
+        //await this.buyTfRamAdmin();
+
         await this.setupRamPermissions();
-        //TODO: Write actions for the below. Ram launch should be purchase in 10x 28000 TLOS chunks due to slipage
-        //await this.buyTframlaunch();
-        //await this.buyTframadmin();
     }
 
     async createRamAccounts() {
@@ -456,6 +461,35 @@ class Launcher {
         await this.setActionPermission(ramAdminAccount, 'active', ramAdminAccount, 'eosio', 'sellram', 'ramdir');
         await this.setAccountPermission(ramAdminAccount, 'owner', 'active', 'owner', ramAdminActive);
         await this.setAccountPermission(ramAdminAccount, 'owner', 'owner', '', ramAdminOwner);
+    }
+
+    async buyTfRamLaunch() {
+        return this.buyRamBatches(ramLaunchBatchCount, ramLaunchBatchSize, ramLaunchAccount);
+    }
+
+    // THIS ASSUMES THE ACCOUNT IS STILL USING EOSIO KEY
+    async buyRamBatches(batchCount, batchSize, accountName) {
+        let count = 0;
+
+        while (++count <= batchCount) {
+            this.log(`Buying batch ${count} for ${accountName} of ${batchSize} ${tokenSymbol}`);
+            await this.sendActions([{
+                account: 'eosio',
+                name: 'buyram',
+                authorization: [{
+                    actor: accountName,
+                    permission: 'active',
+                }],
+                data: {
+                    payer: accountName,
+                    receiver: accountName,
+                    quant: `${batchSize} ${tokenSymbol}`
+                }
+            }]);
+
+            // Sleep so we don't get complaints about the same action in a block.... could also use nonce
+            await this.sleep(1000);
+        }
     }
 
 
@@ -595,24 +629,16 @@ class Launcher {
     }
 
     async setMsigPriv() {
-        this.sendActions([
-            {
-                account: 'eosio',
-                name: 'setpriv',
-                authorization: [{
-                    actor: 'eosio',
-                    permission: 'active',
-                }],
-                data: {
-                    account: 'eosio.msig',
-                    is_priv: 1
-                }
-            }
-        ])
+        return this.setAccountPriv('eosio.msig');
     }
 
     async setWrapPriv() {
-        this.sendActions([
+        return this.setAccountPriv('eosio.wrap');
+    }
+
+    async setAccountPriv(accountName) {
+        this.log(`Making ${accountName} a priviledged account`);
+        return this.sendActions([
             {
                 account: 'eosio',
                 name: 'setpriv',
@@ -621,11 +647,11 @@ class Launcher {
                     permission: 'active',
                 }],
                 data: {
-                    account: 'eosio.wrap',
+                    account: accountName,
                     is_priv: 1
                 }
             }
-        ])
+        ]);
     }
 
     async regBallot() {
