@@ -157,7 +157,8 @@ class Launcher {
         // TODO: inject/distribute TFRP
         // TODO: inject/distribute community rewards
         // TODO: inject tvt token accounts? I removed board accounts here. We wont have one elected anyway.
-        // TODO: inject key recovery CSV
+
+        // TODO: inject key recovery CSV - planning to merge the recovered accounts with the snapshot and to pull both from github
 
         // END OF TF STUFFS
         // now that we've done everything we need to do with the tf accounts... set their permissions
@@ -165,7 +166,6 @@ class Launcher {
 
         await this.ramSetup();
 
-        // TODO: uncomment this!!
         await this.injectGenesis();
 
         // TODO: inject EOS BPs
