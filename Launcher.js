@@ -166,7 +166,7 @@ class Launcher {
         await this.ramSetup();
 
         // TODO: uncomment this!!
-        //await this.injectGenesis();
+        await this.injectGenesis();
 
         // TODO: inject EOS BPs
 
@@ -544,6 +544,9 @@ class Launcher {
                 actions = [];
             }
         }
+
+        if (actions.length)
+            actionChunks.push(actions);
 
         let thisLauncher = this;
 
