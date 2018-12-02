@@ -295,16 +295,16 @@ class Launcher {
         this.log('Creating Telos BP Accounts');
         let telosBPAccounts = await this.getSnapshotMap(telosBPAccountsSnapshot, 2, 3);
 
-        Object.keys(telosBPAccounts).forEach(async accountName => {
+        for (let accountName in telosBPAccounts) {
             this.log(`Creating Telos BP account ${accountName} with pubkey ${telosBPAccounts[accountName]}`);
             await this.createAccount(accountName, telosBPAccounts[accountName], 4096, 1, 1, 0, 'Genesis BP');
-        });
+        }
     }
 
     async createTfAccounts() {
-        Object.keys(tfAccounts).forEach(async accountName => {
+        for (let accountName in tfAccounts) {
             await this.createAccount(accountName, opts.eosioPub, 4096, 8, 2, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
-        });
+        }
 
         this.log(`Creating ${ramAdminAccount} and ${ramLaunchAccount}`);
         await this.createAccount(ramAdminAccount, opts.eosioPub, 4096, 1, 1, 0, 0);
@@ -425,10 +425,10 @@ class Launcher {
     async createRamAccounts() {
         let ramAccounts = await this.getSnapshotMap(ramAccountsSnapshot, 2, 3);
 
-        Object.keys(ramAccounts).forEach(async accountName => {
+        for (let accountName in ramAccounts) {
             this.log(`Creating ram account ${accountName} with pubkey ${ramAccounts[accountName]}`);
             await this.createAccount(accountName, ramAccounts[accountName], 4096, 1, 1, 0, 0);
-        });
+        }
     }
 
     async setupRamPermissions() {
@@ -497,7 +497,7 @@ class Launcher {
         this.accountInjectionCount = 0;
         let actions = [];
         let actionChunks = [];
-        Object.keys(accounts).forEach(accountName => {
+        for (let accountName in accounts) {
             this.accountInjectionCount++;
 
             if (this.accountInjectionCount % 10000 === 0)
@@ -509,7 +509,7 @@ class Launcher {
                 actionChunks.push(actions);
                 actions = [];
             }
-        });
+        }
 
         let thisLauncher = this;
 
