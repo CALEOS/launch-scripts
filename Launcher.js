@@ -13,6 +13,7 @@ const opts = require('./opts.js');
 
 const ramAccountsSnapshot = 'ram_accounts.csv';
 const telosBPAccountsSnapshot = 'initial_block_producers.csv';
+const eosBPAccountsSnapshot = 'eos_accounts.csv';
 
 const ramAdminAccount = 'tf.ramadmin';
 const ramAdminLiquid = '40000.0000';
@@ -168,8 +169,6 @@ class Launcher {
 
         await this.injectGenesis();
 
-        // TODO: inject EOS BPs
-
         // DO THIS LAST!!!
         await this.pushContract('eosio.trail');
         await this.setCodePermission(contracts['eosio.trail']);
@@ -295,10 +294,21 @@ class Launcher {
     async createBPAccounts() {
         this.log('Creating Telos BP Accounts');
         let telosBPAccounts = await this.getSnapshotMap(telosBPAccountsSnapshot, 2, 3);
+        let eosBPAccounts = await this.getSnapshotMap(eosBPAccountsSnapshot, 1, 2);
 
         for (let accountName in telosBPAccounts) {
+            if (eosBPAccounts.hasOwnProperty(accountName)) {
+                delete eosBPAccounts[accountName];
+                this.log(`Found duplicate BP account from EOS that's in the telos list: ${accountName}, will use Telos key and ignore one from EOS`);
+            }
+
             this.log(`Creating Telos BP account ${accountName} with pubkey ${telosBPAccounts[accountName]}`);
             await this.createAccount(accountName, telosBPAccounts[accountName], 4096, 1, 1, 0, 'Genesis BP');
+        }
+
+        for (let accountName in eosBPAccounts) {
+            this.log(`Creating BP account for EOS BP ${accountName} with pubkey ${telosBPAccounts[accountName]}`);
+            await this.createAccount(accountName, eosBPAccounts[accountName], 4096, 1, 1, 0, 'Genesis BP');
         }
     }
 
