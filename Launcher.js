@@ -13,7 +13,7 @@ const opts = require('./opts.js');
 
 const ramAccountsSnapshot = 'ram_accounts.csv';
 const telosBPAccountsSnapshot = 'initial_block_producers.csv';
-const eosBPAccountsSnapshot = 'eos_accounts.csv';
+const eosBPAccountsSnapshot = 'eos_bp_accounts.csv';
 const tfrpAccountsSnapshot = 'tfrp_accounts.csv';
 const tcrpAccountsSnapshot = 'tcrp_accounts.csv';
 const tfvtAccountSnapshot = 'tfvtAccountSnapshot.csv';
