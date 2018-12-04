@@ -446,7 +446,7 @@ class Launcher {
 
         for (let accountName in ramAccounts) {
             this.log(`Creating ram account ${accountName} with pubkey ${ramAccounts[accountName]}`);
-            await this.createAccount(accountName, ramAccounts[accountName], 4096, 1, 1, 0, 0);
+            await this.createAccount(accountName, ramAccounts[accountName], 8192, 1, 1, 0, 0);
         }
     }
 
