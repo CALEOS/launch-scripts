@@ -694,7 +694,7 @@ class Launcher {
                 permission: 'active',
             }],
             data: {
-                issuer: 'eosio.token',
+                issuer: 'eosio',
                 maximum_supply: `${maxSupply} ${tokenSymbol}`
             }
         }];
@@ -703,7 +703,7 @@ class Launcher {
                 account: 'eosio.token',
                 name: 'issue',
                 authorization: [{
-                    actor: 'eosio.token',
+                    actor: 'eosio',
                     permission: 'active',
                 }],
                 data: {
