@@ -14,6 +14,10 @@ const opts = require('./opts.js');
 const ramAccountsSnapshot = 'ram_accounts.csv';
 const telosBPAccountsSnapshot = 'initial_block_producers.csv';
 const eosBPAccountsSnapshot = 'eos_accounts.csv';
+const tfrpAccountsSnapshot = 'tfrp_accounts.csv';
+const tcrpAccountsSnapshot = 'tcrp_accounts.csv';
+const tfvtAccountSnapshot = 'tfvtAccountSnapshot.csv';
+
 
 const ramAdminAccount = 'tf.ramadmin';
 const ramAdminLiquid = '40000.0000';
@@ -155,9 +159,9 @@ class Launcher {
         // TODO: this once it's ready
         //await this.pushContract('tfvt');
 
-        // TODO: inject/distribute TFRP
-        // TODO: inject/distribute community rewards
-        // TODO: inject tvt token accounts? I removed board accounts here. We wont have one elected anyway.
+        // TODO: inject/distribute TFRP from tfrpAccountsSnapshot
+        // TODO: inject/distribute community rewards from tcrpAccountsSnapshot
+        // TODO: inject tvt token accounts from tfvtAccountSnapshot
 
         // TODO: inject key recovery CSV - planning to merge the recovered accounts with the snapshot and to pull both from github
 
