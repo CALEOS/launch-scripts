@@ -322,8 +322,8 @@ class Launcher {
         }
 
         this.log(`Creating ${ramAdminAccount} and ${ramLaunchAccount}`);
-        await this.createAccount(ramAdminAccount, opts.eosioPub, 4096, 1, 1, 0, 0);
-        await this.createAccount(ramLaunchAccount, opts.eosioPub, 4096, 1, 1, 0, 0);
+        await this.createAccount(ramAdminAccount, opts.eosioPub, 8192, 1, 1, 0, 0);
+        await this.createAccount(ramLaunchAccount, opts.eosioPub, 8192, 1, 1, 0, 0);
         this.log(`Transfering to  ${ramAdminAccount} and ${ramLaunchAccount}`);
         await this.sendActions([
             {
