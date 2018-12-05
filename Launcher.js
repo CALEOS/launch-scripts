@@ -176,9 +176,8 @@ class Launcher {
         // now that we've done everything we need to do with the tf accounts... set their permissions
         await this.setTfAccountPermissions();
 
-        await this.ramSetup();
-
         await this.injectGenesis();
+        await this.ramSetup();
 
         // DO THIS LAST!!!
         await this.pushContract('eosio.trail');
