@@ -18,14 +18,16 @@ const tfrpAccountsSnapshot = 'tfrp_accounts.csv';
 const tcrpAccountsSnapshot = 'tcrp_accounts.csv';
 const tfvtAccountSnapshot = 'tfvtAccountSnapshot.csv';
 
+const freeAccount = 'free.tf';
+const freeAccountContractRamBytes = 512000;
 
-const ramAdminAccount = 'tf.ramadmin';
+const ramAdminAccount = 'ramadmin.tf';
 const ramAdminLiquid = '40000.0000';
 const ramAdminMemo = 'RAM Administrator';
-const ramAdminBatchSize = '10000.0000';
-const ramAdminBatchCount = 4;
+const ramAdminBatchSize = '4000.0000';
+const ramAdminBatchCount = 10;
 
-const ramLaunchAccount = 'tf.ramlaunch';
+const ramLaunchAccount = 'ramlaunch.tf';
 const ramLaunchLiquid = '280000.0000';
 const ramLaunchMemo = 'RAM Launch';
 const ramLaunchBatchSize = '28000.0000';
@@ -87,9 +89,9 @@ const tokenIssuances = {
 
 const tfAccounts = {
     'tf': '6000000.0000',
-    'tf.frp': '18000000.0000',
-    'tf.crp': '1000000.0000',
-    'tf.exrsrv': '140279973.0000'
+    'frp.tf': '18000000.0000',
+    'crp.tf': '1000000.0000',
+    'exrsrv.tf': '140279973.0000'
 };
 
 const eosioAccounts = [
@@ -107,8 +109,7 @@ const eosioAccounts = [
     'eosio.arb',
     'eosio.exrsrv',
     'eosio.bpadj',
-    'eosio.wrap',
-    'telos.free'
+    'eosio.wrap'
 ];
 
 // contractDir: accountName
@@ -116,13 +117,13 @@ const contracts = {
     'eosio.amend': 'eosio.amend',
     'eosio.arbitration': 'eosio.arb',
     'eosio.msig': 'eosio.msig',
-    'eosio.wps': 'eosio.saving',
+    'eosio.saving': 'eosio.saving',
     'eosio.system': 'eosio',
     'eosio.token': 'eosio.token',
     'eosio.trail': 'eosio.trail',
     'eosio.wrap': 'eosio.wrap',
     'tfvt': 'tf',
-    'telos.free': 'telos.free'
+    'telos.free': 'free.tf'
 };
 
 class Launcher {
@@ -145,12 +146,11 @@ class Launcher {
         await this.pushContract('eosio.amend');
         await this.setCodePermission(contracts['eosio.amend']);
 
-        // TODO: get the wps contract and deploy it!!
-        //await this.pushContract('eosio.saving');
-        //await this.setCodePermission(contracts['eosio.saving']);
+        await this.pushContract('eosio.saving');
+        await this.setCodePermission(contracts['eosio.saving']);
         await this.pushContract('eosio.wrap');
         await this.pushContract('eosio.system');
-        await this.pushContract('telos.free');
+
         this.loadApi();
         await this.initSystem();
 
@@ -161,6 +161,8 @@ class Launcher {
         await this.createBPAccounts();
 
         await this.createTfAccounts();
+        await this.setupFreeAccounts();
+
         // TODO: this once it's ready
         //await this.pushContract('tfvt');
 
@@ -185,8 +187,7 @@ class Launcher {
         // TODO: figure out when we can run this
         //await this.regBallot();
 
-        //TODO: push when we actually have it
-        //await this.pushContract('eosio.arbitration');
+        await this.pushContract('eosio.arbitration');
 
         // TODO: enable eosio.prods?
         this.log('Launch complete!');
@@ -316,7 +317,7 @@ class Launcher {
         }
 
         for (let accountName in eosBPAccounts) {
-            this.log(`Creating BP account for EOS BP ${accountName} with pubkey ${telosBPAccounts[accountName]}`);
+            this.log(`Creating BP account for EOS BP ${accountName} with pubkey ${eosBPAccounts[accountName]}`);
             await this.createAccount(accountName, eosBPAccounts[accountName], 4096, 1, 1, 0, 'Genesis BP');
         }
     }
@@ -367,15 +368,21 @@ class Launcher {
         await this.setAccountPermission('tf', 'owner', 'active', 'owner', tfActiveOwner);
         await this.setAccountPermission('tf', 'owner', 'owner', '', tfActiveOwner);
 
-        await this.setAccountPermission('tf.frp', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
-        await this.setAccountPermission('tf.frp', 'owner', 'owner', '', tfSubAccountsActiveOwner);
+        await this.setAccountPermission('frp.tf', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
+        await this.setAccountPermission('frp.tf', 'owner', 'owner', '', tfSubAccountsActiveOwner);
 
-        await this.setAccountPermission('tf.crp', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
-        await this.setAccountPermission('tf.crp', 'owner', 'owner', '', tfSubAccountsActiveOwner);
+        await this.setAccountPermission('crp.tf', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
+        await this.setAccountPermission('crp.tf', 'owner', 'owner', '', tfSubAccountsActiveOwner);
 
         // TODO: Does exrsrv control go to prods or tf?
-        await this.setAccountPermission('tf.exrsrv', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
-        await this.setAccountPermission('tf.exrsrv', 'owner', 'owner', '', tfSubAccountsActiveOwner);
+        await this.setAccountPermission('exrsrv.tf', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
+        await this.setAccountPermission('exrsrv.tf', 'owner', 'owner', '', tfSubAccountsActiveOwner);
+    }
+
+    async setupFreeAccounts() {
+        this.log(`Creating ${freeAccount} account`);
+        await this.createAccount(freeAccount, opts.eosioPub, freeAccountContractRamBytes, 8, 2, 0, tfAccountMemo);
+        await this.pushContract('telos.free');
     }
 
     async createAccount(name, pubKey, ramBytes, cpu, net, transfer, memo) {
@@ -439,7 +446,6 @@ class Launcher {
 
         // Doing ram buys before setting permissions
         await this.buyTfRamLaunch();
-
         await this.buyTfRamAdmin();
 
         await this.setupRamPermissions();
