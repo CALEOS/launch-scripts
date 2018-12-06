@@ -448,6 +448,7 @@ class Launcher {
         this.log(`Creating ${freeAccount} account`);
         await this.createAccount(freeAccount, opts.eosioPub, freeAccountContractRamBytes, 8, 2, 0, tfAccountMemo);
         await this.pushContract('telos.free');
+        // TODO: this won't work... it needs to be eosio.code plus tf account, not eosio@active
         await this.setCodePermission(contracts['telos.free']);
     }
 
