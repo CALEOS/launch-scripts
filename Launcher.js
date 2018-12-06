@@ -184,6 +184,7 @@ class Launcher {
         //await this.regBallot();
 
         await this.pushContract('eosio.arbitration');
+        await this.setCodePermission(contracts['eosio.arbitration']);
 
         // TODO: enable eosio.prods?
         this.log('Launch complete!');
