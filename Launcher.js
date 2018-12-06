@@ -180,11 +180,17 @@ class Launcher {
         await this.pushContract('eosio.trail');
         await this.setCodePermission(contracts['eosio.trail']);
 
-        // TODO: figure out when we can run this
+        // TODO: reg VOTE token, do we do it here?
+        //teclos push action eosio.trail regtoken '["10000000000 VOTE", "eosio.trail", ""]' -p eosio
+        //await this.regVoteToken();
+
+        // TODO: figure out when we can run this, it's for the amend contract
         //await this.regBallot();
 
         await this.pushContract('eosio.arbitration');
         await this.setCodePermission(contracts['eosio.arbitration']);
+        // TODO: call setconfig on arbitration
+        // ./teclos.sh push action eosio.arb setconfig '[ 20, 300, 300, 300, [1000000,2000000,3000000] ]' -p eosio
 
         // TODO: enable eosio.prods?
         this.log('Launch complete!');
