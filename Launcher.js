@@ -711,6 +711,12 @@ class Launcher {
                 let pubKey = parts[3];
                 let balance = parts[4];
 
+                if (!accountName || !pubKey || !balance) {
+                    _this.log(`Skipping line from genesis snapshot, missing values ${line}`);
+                    continue;
+                }
+
+
                 snapMeta.account_count++;
                 let balanceFloat = parseFloat(balance);
                 snapMeta.total_balance += balanceFloat;
