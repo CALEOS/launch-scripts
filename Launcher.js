@@ -184,9 +184,6 @@ class Launcher {
         //teclos push action eosio.trail regtoken '["10000000000 VOTE", "eosio.trail", ""]' -p eosio
         //await this.regVoteToken();
 
-        // TODO: figure out when we can run this, it's for the amend contract
-        //await this.regBallot();
-
         await this.pushContract('eosio.arbitration');
         await this.setCodePermission(contracts['eosio.arbitration']);
         // TODO: call setconfig on arbitration
