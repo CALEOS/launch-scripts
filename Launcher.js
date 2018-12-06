@@ -7,7 +7,6 @@ const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 const readline = require('readline');
 const fetch = require('node-fetch');
-const Throttle = require('promise-parallel-throttle');
 const {TextDecoder, TextEncoder} = require('text-encoding');
 const opts = require('./opts.js');
 
@@ -33,7 +32,6 @@ const ramLaunchMemo = 'RAM Launch';
 const ramLaunchBatchSize = '28000.0000';
 const ramLaunchBatchCount = 10;
 
-const sellram = require('./sellram');
 const tfRamadminRamdir = require('./tf.ramadmin.ramdir');
 const tfActiveOwner = require('./tf.account.ao');
 const tfSubAccountsActiveOwner = require('./tf.subaccounts.ao');
@@ -58,24 +56,24 @@ const maxBlockCpu = 4294967295;
 
 // TODO: make sure these values are the final values we want (cpu values are currently at max)
 const globalValues = {
-    "max_transaction_delay": 3888000,
-    "min_transaction_cpu_usage": 100,
-    "net_usage_leeway": 500,
-    "context_free_discount_net_usage_den": 100,
-    "max_transaction_net_usage": 524288,
-    "context_free_discount_net_usage_num": 20,
-    "max_transaction_lifetime": 3600,
-    "deferred_trx_expiration_window": 600,
-    "max_authority_depth": 6,
-    "max_transaction_cpu_usage": 4294967194,
-    "max_block_net_usage": 1048576,
-    "target_block_net_usage_pct": 1000,
-    "max_generated_transaction_count": 16,
-    "max_inline_action_size": 4096,
-    "target_block_cpu_usage_pct": 500,
-    "base_per_transaction_net_usage": 12,
-    "max_block_cpu_usage": 4294967295,
-    "max_inline_action_depth": 4
+    'max_transaction_delay': 3888000,
+    'min_transaction_cpu_usage': 100,
+    'net_usage_leeway': 500,
+    'context_free_discount_net_usage_den': 100,
+    'max_transaction_net_usage': 524288,
+    'context_free_discount_net_usage_num': 20,
+    'max_transaction_lifetime': 3600,
+    'deferred_trx_expiration_window': 600,
+    'max_authority_depth': 6,
+    'max_transaction_cpu_usage': 4294967194,
+    'max_block_net_usage': 1048576,
+    'target_block_net_usage_pct': 1000,
+    'max_generated_transaction_count': 16,
+    'max_inline_action_size': 4096,
+    'target_block_cpu_usage_pct': 500,
+    'base_per_transaction_net_usage': 12,
+    'max_block_cpu_usage': 4294967295,
+    'max_inline_action_depth': 4
 };
 
 const tokenIssuances = {
@@ -165,17 +163,16 @@ class Launcher {
 
         // TODO: this once it's ready
         //await this.pushContract('tfvt');
+        //await this.injectVotingTokens()
 
-        // TODO: inject/distribute TFRP from tfrpAccountsSnapshot
-        // TODO: inject/distribute community rewards from tcrpAccountsSnapshot
-        // TODO: inject tvt token accounts from tfvtAccountSnapshot
-
-        // TODO: inject key recovery CSV - planning to merge the recovered accounts with the snapshot and to pull both from github
+        await this.injectRewardPool();
+        await this.injectCommunityPool();
 
         // END OF TF STUFFS
         // now that we've done everything we need to do with the tf accounts... set their permissions
         await this.setTfAccountPermissions();
 
+        // TODO: merge key recovery CSV - planning to merge the recovered accounts with the snapshot and to pull both from github
         await this.injectGenesis();
         await this.ramSetup();
 
@@ -212,6 +209,45 @@ class Launcher {
 
     async sleep(ms) {
         await new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async getSnapshotMapWithBalances(fileName, accountIndex, keyIndex, balanceIndex, skipSplit) {
+        let contents = await this.getSnapshot(fileName);
+        let snapMap = {};
+
+        let firstLine = true;
+        contents.split('\n').forEach(line => {
+            if (firstLine) {
+                firstLine = false;
+                return;
+            }
+            let lineParts = line.split(',');
+            if (lineParts.length < balanceIndex || lineParts.length < keyIndex || lineParts.length < accountIndex) {
+                this.log(`Skipping line, it's too short: ${line}`);
+                return;
+            }
+
+            let accountName = lineParts[accountIndex].trim();
+            let pubKey = lineParts[keyIndex].trim();
+            let balance = lineParts[balanceIndex].trim();
+            let ramBytes = 4096;
+
+            if (!accountName || ! pubKey || !balance) {
+                this.log(`getSnapshotMap skipping line because it's missing name/key/balance: ${line}`);
+                return;
+            }
+
+            if (pubKey.length != 53) {
+                this.log(`getSnapshotMap skipping line because pubKey too short: ${line}`);
+                return;
+            }
+
+            let split = skipSplit ? {balance} : this.splitBalance(balance);
+
+            snapMap[accountName] = Object.assign({ramBytes, pubKey, accountName}, split);
+        });
+
+        return snapMap;
     }
 
     async getSnapshotMap(fileName, accountIndex, keyIndex) {
@@ -255,6 +291,7 @@ class Launcher {
                     reject(error);
                 }
 
+                this.log(`Got url ${url}`);
                 resolve(body);
             });
         });
@@ -283,7 +320,7 @@ class Launcher {
     }
 
     async initSystem() {
-        this.log("Initializing system");
+        this.log('Initializing system');
         return this.sendActions([
             {
                 account: 'eosio',
@@ -312,12 +349,41 @@ class Launcher {
             }
 
             this.log(`Creating Telos BP account ${accountName} with pubkey ${telosBPAccounts[accountName]}`);
-            await this.createAccount(accountName, telosBPAccounts[accountName], 4096, 1, 1, 0, 'Genesis BP');
+            await this.createAccount(accountName, telosBPAccounts[accountName], 4096, 1, 1, 0, 'Founding BP');
         }
 
         for (let accountName in eosBPAccounts) {
             this.log(`Creating BP account for EOS BP ${accountName} with pubkey ${eosBPAccounts[accountName]}`);
             await this.createAccount(accountName, eosBPAccounts[accountName], 4096, 1, 1, 0, 'Genesis BP');
+        }
+    }
+
+    async injectRewardPool() {
+        this.log('Injecting founders rewards accounts');
+        let tfrpAccounts = await this.getSnapshotMapWithBalances(tfrpAccountsSnapshot, 0, 1, 2);
+        for (let accountName in tfrpAccounts) {
+            this.log(`Creating TFRP account ${accountName}`);
+            await this.sendActions(this.getAccountActions(tfrpAccounts[accountName], 'TFRP'));
+        }
+    }
+
+    async injectCommunityPool() {
+        this.log('Injecting community rewards accounts');
+        let tfrpAccounts = await this.getSnapshotMapWithBalances(tcrpAccountsSnapshot, 0, 1, 2);
+        for (let accountName in tfrpAccounts) {
+            this.log(`Creating TCRP account ${accountName}`);
+            await this.sendActions(this.getAccountActions(tfrpAccounts[accountName], 'TCRP'));
+        }
+    }
+
+    async injectVotingTokens() {
+        this.log('Injecting voting token accounts');
+        let tfvtAccounts = await this.getSnapshotMapWithBalances(tfvtAccountSnapshot, 0, 1, 2, true);
+        for (let accountName in tfvtAccounts) {
+            this.log(`Creating TFVT account ${accountName}`);
+            let acct = tfvtAccounts[accountName];
+            this.createAccount(accountName, acct.pubKey, 4096, 8, 2, 0, 'TFVT');
+            this.issueVotingToken(accountName, acct.balance);
         }
     }
 
@@ -397,25 +463,23 @@ class Launcher {
 
     async createEosioAccounts() {
         this.log('Creating eosio accounts...');
-        let promises = [];
-        for (let i = 0; i < eosioAccounts.length; i++) {
-            promises.push(this.createSystemAccount(eosioAccounts[i]));
-        }
-        await Promise.all(promises);
+        for (let i = 0; i < eosioAccounts.length; i++)
+            await this.createSystemAccount(eosioAccounts[i]);
+
         this.log('eosio accounts created');
     }
 
     async setCodePermission(accountName) {
         return this.setAccountPermission(accountName, 'active', 'active', 'owner', {
-            "threshold": 1,
-            "keys": [],
-            "waits": [],
-            "accounts": [{
-                "permission": {"actor": "eosio", "permission": "active"},
-                "weight": 1
+            'threshold': 1,
+            'keys': [],
+            'waits': [],
+            'accounts': [{
+                'permission': {'actor': 'eosio', 'permission': 'active'},
+                'weight': 1
             }, {
-                "permission": {"actor": accountName, "permission": "eosio.code"},
-                "weight": 1
+                'permission': {'actor': accountName, 'permission': 'eosio.code'},
+                'weight': 1
             }]
         });
     }
@@ -546,15 +610,15 @@ class Launcher {
     }
 
     async injectGenesis() {
-        this.log("Getting genesis accounts...");
-        this.genesisAccounts = await this.getGenesisAccounts();
+        this.log('Getting genesis accounts...');
+        let genesisAccounts = await this.getGenesisAccounts();
         await this.setGlobals(true);
-        await this.injectAccounts(this.genesisAccounts);
+        await this.injectAccounts(genesisAccounts);
         await this.setGlobals(false);
     }
 
     async injectAccounts(accounts) {
-        this.log("Injecting accounts...");
+        this.log('Injecting accounts...');
         this.accountInjectionCount = 0;
         let actions = [];
         let actionChunks = [];
@@ -562,7 +626,7 @@ class Launcher {
             this.accountInjectionCount++;
 
             if (this.accountInjectionCount % 10000 === 0)
-                this.log("Created " + this.accountInjectionCount + " account promises");
+                this.log(`Created ${this.accountInjectionCount} account promises`);
 
             let account = accounts[accountName];
             actions = actions.concat(this.getAccountActions(account, genesisMemo));
@@ -580,7 +644,7 @@ class Launcher {
         async function sendWorker() {
             while (actionChunks.length) {
                 if (actionChunks.length % 10 === 0)
-                    thisLauncher.log(actionChunks.length + " action chunks left");
+                    thisLauncher.log(`${actionChunks.length} action chunks left`);
 
                 await thisLauncher.sendActions(actionChunks.shift());
             }
@@ -597,13 +661,34 @@ class Launcher {
         }
 
         let threads = [];
-        this.log("Starting " + injectionThreadCount + " injection \"workers\"");
-        this.log("Will be injecting " + actionChunks.length + " batches of actions");
+        this.log(`Starting ${injectionThreadCount} injection "workers"`);
+        this.log(`Will be injecting ${actionChunks.length} batches of actions`);
         for (let i = 0; i < injectionThreadCount; i++)
             threads.push(sendWorker());
 
         await Promise.all(threads);
-        this.log("Done injecting");
+        this.log(`Done injecting`);
+    }
+
+    splitBalance(balance) {
+        let liquid;
+        if (balance <= 3)
+            liquid = .1;
+        else if (balance > 3 && balance <= 11)
+            liquid = 2;
+        else
+            liquid = 10;
+
+        let remainder = this.forcePrecision(balance - liquid);
+        let cpuStake = this.forcePrecision(remainder / 2);
+        let netStake = this.forcePrecision(remainder - cpuStake);
+
+        return {
+            liquid,
+            remainder,
+            cpuStake,
+            netStake
+        };
     }
 
     async getGenesisAccounts() {
@@ -611,7 +696,11 @@ class Launcher {
         return new Promise(async function(resolve, reject) {
             let accounts = {};
             let snapMeta = {};
-            await _this.readCsv('./snapshot.csv', function(line) {
+            let genesis = await _this.getSnapshot('tlos_genesis_snapshot.csv');
+            genesis = genesis.split('\n');
+            for (let i = 1; i < genesis.length; i++) {
+                let line = genesis[i];
+                //await _this.readCsv('./snapshot.csv', function(line) {
                 let parts = line.split(',');
                 let accountName = parts[2];
                 let pubKey = parts[3];
@@ -621,38 +710,28 @@ class Launcher {
                 let balanceFloat = parseFloat(balance);
                 snapMeta.total_balance += balanceFloat;
 
-                let liquid;
-                if (balance <= 3)
-                    liquid = .1;
-                else if (balance > 3 && balance <= 11)
-                    liquid = 2;
-                else
-                    liquid = 10;
-
-
-                let remainder = _this.forcePrecision(balance - liquid);
-                let cpuStake = _this.forcePrecision(remainder / 2);
-                let netStake = _this.forcePrecision(remainder - cpuStake);
+                let split = _this.splitBalance(balance);
 
                 if (_this.debugAccounts && _this.debugAccounts.indexOf(accountName) > -1) {
-                    this.log("Account " + accountName + " =========");
-                    this.log("balance: " + balance);
-                    this.log("remainder: " + remainder);
-                    this.log("liquid: " + liquid);
-                    this.log("cpuStake: " + cpuStake);
-                    this.log("netStake: " + netStake);
+                    _this.log(`Account ${accountName} =========`);
+                    _this.log(`balance: ${balance}`);
+                    _this.log(`remainder: ${split.remainder}`);
+                    _this.log(`liquid: ${split.liquid}`);
+                    _this.log(`cpuStake: ${split.cpuStake}`);
+                    _this.log(`netStake: ${split.netStake}`);
                 }
 
                 accounts[accountName] = {
-                    liquid: liquid,
+                    liquid: split.liquid,
                     balance: balanceFloat,
                     accountName: accountName,
                     pubKey: pubKey,
-                    cpuStake: cpuStake,
-                    netStake: netStake,
+                    cpuStake: split.cpuStake,
+                    netStake: split.netStake,
                     ramBytes: 4096
                 };
-            });
+            }
+            //});
 
             resolve(accounts);
         });
@@ -850,8 +929,8 @@ class Launcher {
                     keys: [],
                     accounts: [{
                         permission: {
-                            actor: "eosio",
-                            permission: "active"
+                            actor: 'eosio',
+                            permission: 'active'
                         },
                         weight: 1
                     }],
@@ -862,8 +941,8 @@ class Launcher {
                     keys: [],
                     accounts: [{
                         permission: {
-                            actor: "eosio",
-                            permission: "active"
+                            actor: 'eosio',
+                            permission: 'active'
                         },
                         weight: 1
                     }],
@@ -899,7 +978,7 @@ class Launcher {
     }
 
     log(message) {
-        console.log(`${new Date().toISOString().slice(0, 19).replace("T", " ")} ${message}`);
+        console.log(`${new Date().toISOString().slice(0, 19).replace('T', ' ')} ${message}`);
     }
 }
 
