@@ -517,9 +517,8 @@ class Launcher {
         await this.createRamAccounts();
 
         // Doing ram buys before setting permissions
-        await this.buyTfRamLaunch();
         await this.buyTfRamAdmin();
-
+        await this.buyTfRamLaunch();
         await this.setupRamPermissions();
     }
 
