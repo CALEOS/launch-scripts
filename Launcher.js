@@ -163,7 +163,7 @@ class Launcher {
 
         // TODO: this once it's ready
         //await this.pushContract('tfvt');
-        //await this.injectVotingTokens()
+        //await this.injectVotingTokens();
 
         await this.injectRewardPool();
         await this.injectCommunityPool();
@@ -172,7 +172,6 @@ class Launcher {
         // now that we've done everything we need to do with the tf accounts... set their permissions
         await this.setTfAccountPermissions();
 
-        // TODO: merge key recovery CSV - planning to merge the recovered accounts with the snapshot and to pull both from github
         await this.injectGenesis();
         await this.ramSetup();
 
@@ -696,17 +695,44 @@ class Launcher {
         };
     }
 
+    async getRecoveredKeys() {
+        let recovered = await this.getSnapshot('key_recovery.csv');
+        let recoveredLines = recovered.split('\n');
+        let keyMap = {};
+        for (let i = 1; i < recoveredLines.length; i++) {
+            let line = recoveredLines[i];
+            let parts = line.split(',');
+            if (parts.length < 3) {
+                this.log(`Key recovery line invalid: ${line}`);
+                continue;
+            }
+
+            let ethKey = parts[0].trim();
+            let tlosKey = parts[1].trim();
+
+            if (!ethKey || !tlosKey) {
+                this.log(`Key recovery line had invalid keys: ${line}`);
+                continue;
+            }
+
+            keyMap[ethKey.toLowerCase()] = tlosKey;
+        }
+
+        return keyMap;
+    }
+
     async getGenesisAccounts() {
         let _this = this;
         return new Promise(async function(resolve, reject) {
             let accounts = {};
             let snapMeta = {};
             let genesis = await _this.getSnapshot('tlos_genesis_snapshot.csv');
+            let recoveredMap = await _this.getRecoveredKeys();
             genesis = genesis.split('\n');
             for (let i = 1; i < genesis.length; i++) {
                 let line = genesis[i];
-                //await _this.readCsv('./snapshot.csv', function(line) {
                 let parts = line.split(',');
+                let ethKey = parts[1];
                 let accountName = parts[2];
                 let pubKey = parts[3];
                 let balance = parts[4];
@@ -716,6 +742,10 @@ class Launcher {
                     continue;
                 }
 
+                if (recoveredMap.hasOwnProperty(ethKey.toLowerCase())) {
+                    _this.log(`Found recovered ethKey ${ethKey}, using ${recoveredMap[ethKey.toLowerCase()]} instead of ${pubKey} for account ${accountName} with balance ${balance}`);
+                    pubKey = recoveredMap[ethKey.toLowerCase()];
+                }
 
                 snapMeta.account_count++;
                 let balanceFloat = parseFloat(balance);
@@ -742,7 +772,6 @@ class Launcher {
                     ramBytes: 4096
                 };
             }
-            //});
 
             resolve(accounts);
         });
