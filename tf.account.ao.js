@@ -38,6 +38,13 @@ module.exports = {
                 },
             "weight":1
         },
+        {
+            "permission":
+                {
+                    "actor":"tf","permission":"eosio.code"
+                },
+            "weight":5
+        },        
         { "permission":
                 {
                     "actor":"tlsvenezuela","permission":"active"
