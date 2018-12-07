@@ -32,6 +32,8 @@ const ramLaunchMemo = 'RAM Launch';
 const ramLaunchBatchSize = '28000.0000';
 const ramLaunchBatchCount = 10;
 
+const eosioActiveAuth = require('./eosioActiveAuthority');
+
 const tfRamadminRamdir = require('./tf.ramadmin.ramdir');
 const tfActiveOwner = require('./tf.account.ao');
 const tfSubAccountsActiveOwner = require('./tf.subaccounts.ao');
@@ -124,6 +126,66 @@ const contracts = {
     'telos.free': 'free.tf'
 };
 
+const trailTokenSettings = {
+    'is_destructible': false,
+    'is_proxyable': false,
+    'is_burnable': false,
+    'is_seizable': false,
+    'is_max_mutable': true,
+    'is_transferable': false,
+    'is_recastable': false,
+    'is_initialized': false,
+    'counterbal_decay_rate': 300,
+    'lock_after_initialize': true
+};
+
+const trailInitSettingsData = {
+    'publisher': 'eosio.trail',
+    'token_symbol': '4,VOTE',
+    'new_settings': trailTokenSettings
+};
+
+const regVoteTokenData = {
+    'max_supply': '10000000000 VOTE',
+    'publisher': 'eosio.trail',
+    'info_url': ''
+};
+
+const arbSetConfig = {
+    'max_elected_arbs': 20,
+    'election_duration': 300,
+    'start_election': 300,
+    'arbitrator_term_length': 300,
+    'fees': [1000000, 2000000, 3000000]
+};
+
+const wpsSetEnv = {
+    'new_environment': {
+        'publisher': 'eosio.saving',
+        'cycle_duration': 2500000,
+        'fee_percentage': 3,
+        'fee_min': 50000,
+        'start_delay': 864000000,
+        'threshold_pass_voters': 5,
+        'threshold_pass_votes': 50,
+        'threshold_fee_voters': 4,
+        'threshold_fee_votes': 20
+    }
+};
+
+const amendSetEnv = {
+    'new_environment': {
+        'publisher': 'eosio.amend',
+        'expiration_length': 2500000,
+        'fee': 1000000,
+        'start_delay': 864000000,
+        'threshold_pass_voters': 5,
+        'threshold_pass_votes': 66.67,
+        'threshold_fee_voters': 4,
+        'threshold_fee_votes': 25
+    }
+};
+
 class Launcher {
 
     constructor() {
@@ -141,11 +203,7 @@ class Launcher {
         await this.createAndIssueTokens();
         await this.pushContract('eosio.msig');
 
-        await this.pushContract('eosio.amend');
-        await this.setCodePermission(contracts['eosio.amend']);
 
-        await this.pushContract('eosio.saving');
-        await this.setCodePermission(contracts['eosio.saving']);
         await this.pushContract('eosio.wrap');
         await this.pushContract('eosio.system');
 
@@ -161,10 +219,6 @@ class Launcher {
         await this.createTfAccounts();
         await this.setupFreeAccounts();
 
-        // TODO: this once it's ready
-        //await this.pushContract('tfvt');
-        //await this.injectVotingTokens();
-
         await this.injectRewardPool();
         await this.injectCommunityPool();
 
@@ -175,18 +229,27 @@ class Launcher {
         await this.injectGenesis();
         await this.ramSetup();
 
+        // trail->wps->amend->arbitration->tfvt
         // DO THIS LAST!!!
         await this.pushContract('eosio.trail');
         await this.setCodePermission(contracts['eosio.trail']);
+        await this.setupTrailService();
 
-        // TODO: reg VOTE token, do we do it here?
-        //teclos push action eosio.trail regtoken '["10000000000 VOTE", "eosio.trail", ""]' -p eosio
-        //await this.regVoteToken();
+        await this.pushContract('eosio.saving');
+        await this.setCodePermission(contracts['eosio.saving']);
+        await this.setupWps();
+
+        await this.pushContract('eosio.amend');
+        await this.setCodePermission(contracts['eosio.amend']);
+        await this.setupAmend();
 
         await this.pushContract('eosio.arbitration');
         await this.setCodePermission(contracts['eosio.arbitration']);
-        // TODO: call setconfig on arbitration
-        // ./teclos.sh push action eosio.arb setconfig '[ 20, 300, 300, 300, [1000000,2000000,3000000] ]' -p eosio
+        await this.setupArbitration();
+
+        // TODO: this once it's ready
+        //await this.pushContract('tfvt');
+        //await this.injectVotingTokens();
 
         // TODO: enable eosio.prods?
         this.log('Launch complete!');
@@ -203,11 +266,6 @@ class Launcher {
             textEncoder: new TextEncoder,
             textDecoder: new TextDecoder
         });
-    }
-
-    async test() {
-        let accts = await this.getGenesisAccounts();
-        this.log(accts);
     }
 
     async sleep(ms) {
@@ -235,7 +293,7 @@ class Launcher {
             let balance = lineParts[balanceIndex].trim();
             let ramBytes = 4096;
 
-            if (!accountName || ! pubKey || !balance) {
+            if (!accountName || !pubKey || !balance) {
                 this.log(`getSnapshotMap skipping line because it's missing name/key/balance: ${line}`);
                 return;
             }
@@ -270,7 +328,7 @@ class Launcher {
             let accountName = lineParts[accountIndex].trim();
             let pubKey = lineParts[keyIndex].trim();
 
-            if (!accountName || ! pubKey) {
+            if (!accountName || !pubKey) {
                 this.log(`getSnapshotMap skipping line because it's missing name/key: ${line}`);
                 return;
             }
@@ -340,6 +398,78 @@ class Launcher {
         ]);
     }
 
+    async setupTrailService() {
+        //teclos push action eosio.trail regtoken '["10000000000 VOTE", "eosio.trail", ""]' -p eosio
+        this.log('Setting up trail service');
+        return this.sendActions([
+            {
+                account: 'eosio.trail',
+                name: 'regtoken',
+                authorization: [{
+                    actor: 'eosio.trail',
+                    permission: 'active',
+                }],
+                data: regVoteTokenData
+            },
+            {
+                account: 'eosio.trail',
+                name: 'initsettings',
+                authorization: [{
+                    actor: 'eosio.trail',
+                    permission: 'active',
+                }],
+                data: trailInitSettingsData
+            }
+        ]);
+    }
+
+    async setupArbitration() {
+        this.log('Setting up arbitration');
+        // TODO: Do we init election at launch?
+        //teclos push action eosio.arb initelection '[]' -p eosio
+        return this.sendActions([
+            {
+                account: 'eosio.arb',
+                name: 'setconfig',
+                authorization: [{
+                    actor: 'eosio',
+                    permission: 'active',
+                }],
+                data: arbSetConfig
+            }
+        ]);
+    }
+
+    async setupWps() {
+        this.log('Setting up WPS');
+        return this.sendActions([
+            {
+                account: 'eosio.saving',
+                name: 'setenv',
+                authorization: [{
+                    actor: 'eosio.saving',
+                    permission: 'active',
+                }],
+                data: wpsSetEnv
+            }
+        ]);
+    }
+
+    async setupAmend() {
+        this.log('Setting up amend');
+        return this.sendActions([
+            {
+                account: 'eosio.amend',
+                name: 'setenv',
+                authorization: [{
+                    actor: 'eosio.amend',
+                    permission: 'active',
+                }],
+                data: amendSetEnv
+            }
+        ]);
+    }
+
     async createBPAccounts() {
         this.log('Creating Telos BP Accounts');
         let telosBPAccounts = await this.getSnapshotMap(telosBPAccountsSnapshot, 2, 3);
@@ -392,6 +522,7 @@ class Launcher {
 
     async createTfAccounts() {
         for (let accountName in tfAccounts) {
+            this.log(`Creating Telos Foundation account: ${accountName}`);
             await this.createAccount(accountName, opts.eosioPub, 4096, 8, 2, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
         }
 
@@ -442,17 +573,31 @@ class Launcher {
         await this.setAccountPermission('crp.tf', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
         await this.setAccountPermission('crp.tf', 'owner', 'owner', '', tfSubAccountsActiveOwner);
 
-        // TODO: Does exrsrv control go to prods or tf?
-        await this.setAccountPermission('exrsrv.tf', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
-        await this.setAccountPermission('exrsrv.tf', 'owner', 'owner', '', tfSubAccountsActiveOwner);
+        // eosio.prods owns this account, set active/owner to eosio@active
+        await this.setAccountPermission('exrsrv.tf', 'owner', 'active', 'owner', eosioActiveAuth);
+        await this.setAccountPermission('exrsrv.tf', 'owner', 'owner', '', eosioActiveAuth);
+
+        // Only do owner, active is already setup
+        await this.setAccountPermission(freeAccount, 'owner', 'owner', '', tfSubAccountsActiveOwner);
     }
 
     async setupFreeAccounts() {
         this.log(`Creating ${freeAccount} account`);
         await this.createAccount(freeAccount, opts.eosioPub, freeAccountContractRamBytes, 8, 2, 0, tfAccountMemo);
         await this.pushContract('telos.free');
-        // TODO: this won't work... it needs to be eosio.code plus tf account, not eosio@active
-        await this.setCodePermission(contracts['telos.free']);
+        //await this.setCodePermission(contracts['telos.free']);
+        return this.setAccountPermission(freeAccount, 'owner', 'active', 'owner', {
+            'threshold': 1,
+            'keys': [],
+            'waits': [],
+            'accounts': [{
+                'permission': {'actor': freeAccount, 'permission': 'eosio.code'},
+                'weight': 1
+            }, {
+                'permission': {'actor': 'tf', 'permission': 'active'},
+                'weight': 1
+            }]
+        });
     }
 
     async createAccount(name, pubKey, ramBytes, cpu, net, transfer, memo) {
@@ -964,30 +1109,8 @@ class Launcher {
             data: {
                 creator: 'eosio',
                 name: accountName,
-                owner: {
-                    threshold: 1,
-                    keys: [],
-                    accounts: [{
-                        permission: {
-                            actor: 'eosio',
-                            permission: 'active'
-                        },
-                        weight: 1
-                    }],
-                    waits: []
-                },
-                active: {
-                    threshold: 1,
-                    keys: [],
-                    accounts: [{
-                        permission: {
-                            actor: 'eosio',
-                            permission: 'active'
-                        },
-                        weight: 1
-                    }],
-                    waits: []
-                },
+                owner: eosioActiveAuth,
+                active: eosioActiveAuth
             },
         }]);
     }
