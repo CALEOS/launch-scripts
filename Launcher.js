@@ -269,7 +269,7 @@ class Launcher {
         await this.pushContract('telos.tfvt');
         await this.setupTfvt();
         await this.injectVotingTokens();
-        await this.setTfAccountPermissions();
+//        await this.setTfAccountPermissions();
 
         // TODO: deferred actions for arbitration and tf board election to start just before activation
         // TODO: enable eosio.prods?
