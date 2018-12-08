@@ -15,7 +15,9 @@ const telosBPAccountsSnapshot = 'initial_block_producers.csv';
 const eosBPAccountsSnapshot = 'eos_bp_accounts.csv';
 const tfrpAccountsSnapshot = 'tfrp_accounts.csv';
 const tcrpAccountsSnapshot = 'tcrp_accounts.csv';
-const tfvtAccountSnapshot = 'tfvtAccountSnapshot.csv';
+const tfvtAccountSnapshot = 'tfvt_accounts.csv';
+
+const tfAccountContractRamBytes = 1024000;
 
 const freeAccount = 'free.tf';
 const freeAccountContractRamBytes = 512000;
@@ -122,18 +124,18 @@ const contracts = {
     'eosio.token': 'eosio.token',
     'eosio.trail': 'eosio.trail',
     'eosio.wrap': 'eosio.wrap',
-    'tfvt': 'tf',
+    'telos.tfvt': 'tf',
     'telos.free': 'free.tf'
 };
 
-const trailTokenSettings = {
+const trailVoteTokenSettings = {
     'is_destructible': false,
     'is_proxyable': false,
     'is_burnable': false,
     'is_seizable': false,
     'is_max_mutable': true,
     'is_transferable': false,
-    'is_recastable': false,
+    'is_recastable': true,
     'is_initialized': false,
     'counterbal_decay_rate': 300,
     'lock_after_initialize': true
@@ -142,7 +144,7 @@ const trailTokenSettings = {
 const trailInitSettingsData = {
     'publisher': 'eosio.trail',
     'token_symbol': '4,VOTE',
-    'new_settings': trailTokenSettings
+    'new_settings': trailVoteTokenSettings
 };
 
 const regVoteTokenData = {
@@ -186,6 +188,23 @@ const amendSetEnv = {
     }
 };
 
+const tfvtSetConfig = {
+    'publisher': 'tf',
+    'new_config': {
+        'publisher': 'tf',
+        'max_board_seats': 12,
+        'open_seats': 12,
+        'open_election_id': 0,
+        'holder_quorum_divisor': 5,
+        'board_quorum_divisor': 2,
+        'issue_duration': 2000000,
+        'start_delay': 1200,
+        'leaderboard_duration': 2000000,
+        'election_frequency': 14515200,
+        'last_board_election_time': 0
+    }
+};
+
 class Launcher {
 
     constructor() {
@@ -224,9 +243,9 @@ class Launcher {
 
         // END OF TF STUFFS
         // now that we've done everything we need to do with the tf accounts... set their permissions
-        await this.setTfAccountPermissions();
+        await this.setTfSubAccountPermissions();
 
-        await this.injectGenesis();
+        //await this.injectGenesis();
         await this.ramSetup();
 
         // trail->wps->amend->arbitration->tfvt
@@ -247,10 +266,12 @@ class Launcher {
         await this.setCodePermission(contracts['eosio.arbitration']);
         await this.setupArbitration();
 
-        // TODO: this once it's ready
-        //await this.pushContract('tfvt');
-        //await this.injectVotingTokens();
+        await this.pushContract('telos.tfvt');
+        await this.setupTfvt();
+        await this.injectVotingTokens();
+        await this.setTfAccountPermissions();
 
+        // TODO: deferred actions for arbitration and tf board election to start just before activation
         // TODO: enable eosio.prods?
         this.log('Launch complete!');
     }
@@ -288,7 +309,7 @@ class Launcher {
                 return;
             }
 
-            let accountName = lineParts[accountIndex].trim();
+            let accountName = lineParts[accountIndex].trim().toLowerCase();
             let pubKey = lineParts[keyIndex].trim();
             let balance = lineParts[balanceIndex].trim();
             let ramBytes = 4096;
@@ -300,6 +321,11 @@ class Launcher {
 
             if (pubKey.length != 53) {
                 this.log(`getSnapshotMap skipping line because pubKey too short: ${line}`);
+                return;
+            }
+
+            if (accountName.length > 12) {
+                this.log(`getSnapshotMap skipping line because accountName is too long: ${accountName}`);
                 return;
             }
 
@@ -325,11 +351,16 @@ class Launcher {
             if (lineParts.length < 4)
                 return;
 
-            let accountName = lineParts[accountIndex].trim();
+            let accountName = lineParts[accountIndex].trim().toLowerCase();
             let pubKey = lineParts[keyIndex].trim();
 
             if (!accountName || !pubKey) {
                 this.log(`getSnapshotMap skipping line because it's missing name/key: ${line}`);
+                return;
+            }
+
+            if (accountName.length > 12) {
+                this.log(`getSnapshotMap skipping because account name is too long: ${line}`);
                 return;
             }
 
@@ -425,8 +456,6 @@ class Launcher {
 
     async setupArbitration() {
         this.log('Setting up arbitration');
-        // TODO: Do we init election at launch?
-        //teclos push action eosio.arb initelection '[]' -p eosio
         return this.sendActions([
             {
                 account: 'eosio.arb',
@@ -466,6 +495,42 @@ class Launcher {
                     permission: 'active',
                 }],
                 data: amendSetEnv
+            }
+        ]);
+    }
+
+    async setupTfvt() {
+        this.log('Setting up tfvt');
+        await this.setCodePermission('tf');
+        return this.sendActions([
+            {
+                account: 'tf',
+                name: 'setconfig',
+                authorization: [{
+                    actor: 'tf',
+                    permission: 'active',
+                }],
+                data: tfvtSetConfig
+            },{
+                account: 'tf',
+                name: 'inittfvt',
+                authorization: [{
+                    actor: 'tf',
+                    permission: 'active',
+                }],
+                data: {
+                    initial_info_link: ''
+                }
+            },{
+                account: 'tf',
+                name: 'inittfboard',
+                authorization: [{
+                    actor: 'tf',
+                    permission: 'active',
+                }],
+                data: {
+                    initial_info_link: ''
+                }
             }
         ]);
     }
@@ -511,19 +576,38 @@ class Launcher {
 
     async injectVotingTokens() {
         this.log('Injecting voting token accounts');
-        let tfvtAccounts = await this.getSnapshotMapWithBalances(tfvtAccountSnapshot, 0, 1, 2, true);
+        let tfvtAccounts = await this.getSnapshotMapWithBalances(tfvtAccountSnapshot, 2, 3, 4, true);
         for (let accountName in tfvtAccounts) {
             this.log(`Creating TFVT account ${accountName}`);
             let acct = tfvtAccounts[accountName];
-            this.createAccount(accountName, acct.pubKey, 4096, 8, 2, 0, 'TFVT');
-            this.issueVotingToken(accountName, acct.balance);
+            await this.createAccount(accountName, acct.pubKey, 4096, 8, 2, 0, 'TFVT');
+            await this.issueVotingToken(accountName, acct.balance);
         }
+    }
+
+    async issueVotingToken(accountName, accountBalance) {
+        return this.sendActions([
+            {
+                account: 'eosio.trail',
+                name: 'issuetoken',
+                authorization: [{
+                    actor: 'tf',
+                    permission: 'active',
+                }],
+                data: {
+                    'publisher': 'tf',
+                    'recipient': accountName,
+                    'tokens': `${accountBalance} TFVT`,
+                    'airgrab': false
+                }
+            }
+        ])
     }
 
     async createTfAccounts() {
         for (let accountName in tfAccounts) {
             this.log(`Creating Telos Foundation account: ${accountName}`);
-            await this.createAccount(accountName, opts.eosioPub, 4096, 8, 2, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
+            await this.createAccount(accountName, opts.eosioPub, tfAccountContractRamBytes, 8, 2, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
         }
 
         this.log(`Creating ${ramAdminAccount} and ${ramLaunchAccount}`);
@@ -563,9 +647,12 @@ class Launcher {
     }
 
     async setTfAccountPermissions() {
-        this.log('Setting permissions for tf accounts');
         await this.setAccountPermission('tf', 'owner', 'active', 'owner', tfActiveOwner);
         await this.setAccountPermission('tf', 'owner', 'owner', '', tfActiveOwner);
+    }
+
+    async setTfSubAccountPermissions() {
+        this.log('Setting permissions for tf accounts');
 
         await this.setAccountPermission('frp.tf', 'owner', 'active', 'owner', tfSubAccountsActiveOwner);
         await this.setAccountPermission('frp.tf', 'owner', 'owner', '', tfSubAccountsActiveOwner);
