@@ -607,7 +607,10 @@ class Launcher {
     async createTfAccounts() {
         for (let accountName in tfAccounts) {
             this.log(`Creating Telos Foundation account: ${accountName}`);
-            await this.createAccount(accountName, opts.eosioPub, tfAccountContractRamBytes, 8, 2, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
+            if (accountName == 'tf')
+                await this.createAccount(accountName, opts.eosioPub, tfAccountContractRamBytes, 10, 10, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
+            else
+                await this.createAccount(accountName, opts.eosioPub, 4096, 8, 2, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
         }
 
         this.log(`Creating ${ramAdminAccount} and ${ramLaunchAccount}`);
