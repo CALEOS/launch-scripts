@@ -245,7 +245,7 @@ class Launcher {
         // now that we've done everything we need to do with the tf accounts... set their permissions
         await this.setTfSubAccountPermissions();
 
-        //await this.injectGenesis();
+        await this.injectGenesis();
         await this.ramSetup();
 
         // trail->wps->amend->arbitration->tfvt
