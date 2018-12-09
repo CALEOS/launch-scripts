@@ -270,7 +270,12 @@ class SnapshotHandler {
             let accountName = parts[2];
             let pubKey = parts[3];
             let balance = parts[4];
-
+            
+            if (accountName.length != 12 || pubKey.length != 53) {
+                console.log("CANNOT HANDLE THIS LINE, SKIPPING IT: " + line);
+                return;
+            }
+            
             snapMeta.account_count++;
             let balanceFloat = parseFloat(balance);
             snapMeta.total_balance += balanceFloat;
