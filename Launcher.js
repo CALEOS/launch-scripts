@@ -619,6 +619,8 @@ class Launcher {
                 await this.createAccount(accountName, opts.eosioPub, tfAccountContractRamBytes, 10, 10, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
             else if (accountName == 'frp.tf')
                 await this.createAccount(accountName, opts.eosioPub, frpTfAccountTransferRamBytes, 10, 10, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
+            else if (accountName == 'crp.tf')
+                await this.createAccount(accountName, opts.eosioPub, 4096, 10, 10, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
             else
                 await this.createAccount(accountName, opts.eosioPub, 4096, 8, 2, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
         }
