@@ -567,10 +567,13 @@ class Launcher {
 
     async injectCommunityPool() {
         this.log('Injecting community rewards accounts');
-        let tfrpAccounts = await this.getSnapshotMapWithBalances(tcrpAccountsSnapshot, 0, 1, 2);
-        for (let accountName in tfrpAccounts) {
+        let tcrpAccounts = await this.getSnapshotMapWithBalances(tcrpAccountsSnapshot, 0, 1, 2);
+        for (let accountName in tcrpAccounts) {
             this.log(`Creating TCRP account ${accountName}`);
-            await this.sendActions(this.getAccountActions(tfrpAccounts[accountName], 'TCRP'));
+            tcrpAccounts[accountName].cpuStake = 1;
+            tcrpAccounts[accountName].netStake = 1;
+            tcrpAccounts[accountName].liquid = 0;
+            await this.sendActions(this.getAccountActions(tcrpAccounts[accountName], 'TCRP'));
         }
     }
 
