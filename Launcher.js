@@ -19,6 +19,8 @@ const tfvtAccountSnapshot = 'tfvt_accounts.csv';
 
 const tfAccountContractRamBytes = 1024000;
 
+const frpTfAccountTransferRamBytes = 128000;
+
 const freeAccount = 'free.tf';
 const freeAccountContractRamBytes = 512000;
 
@@ -561,7 +563,7 @@ class Launcher {
         let tfrpAccounts = await this.getSnapshotMapWithBalances(tfrpAccountsSnapshot, 0, 1, 2);
         for (let accountName in tfrpAccounts) {
             this.log(`Creating TFRP account ${accountName}`);
-            await this.sendActions(this.getAccountActions(tfrpAccounts[accountName], 'TFRP'));
+            await this.sendActions(this.getAccountActions(tfrpAccounts[accountName], 'TFRP', 'frp.tf'));
         }
     }
 
@@ -573,7 +575,7 @@ class Launcher {
             tcrpAccounts[accountName].cpuStake = .9;
             tcrpAccounts[accountName].netStake = .1;
             tcrpAccounts[accountName].liquid = 0;
-            await this.sendActions(this.getAccountActions(tcrpAccounts[accountName], 'TCRP'));
+            await this.sendActions(this.getAccountActions(tcrpAccounts[accountName], 'TCRP', 'crp.tf'));
         }
     }
 
@@ -612,6 +614,8 @@ class Launcher {
             this.log(`Creating Telos Foundation account: ${accountName}`);
             if (accountName == 'tf')
                 await this.createAccount(accountName, opts.eosioPub, tfAccountContractRamBytes, 10, 10, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
+            else if (accountName == 'frp.tf')
+                await this.createAccount(accountName, opts.eosioPub, frpTfAccountTransferRamBytes, 10, 10, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
             else
                 await this.createAccount(accountName, opts.eosioPub, 4096, 8, 2, parseFloat(tfAccounts[accountName], 10), tfAccountMemo);
         }
@@ -1112,7 +1116,7 @@ class Launcher {
         });
     }
 
-    getAccountActions(acct, memo) {
+    getAccountActions(acct, memo, transferFrom = 'eosio') {
         let accountName = acct.accountName;
         let actions = [{
             account: 'eosio',
@@ -1159,11 +1163,11 @@ class Launcher {
             account: 'eosio',
             name: 'delegatebw',
             authorization: [{
-                actor: 'eosio',
+                actor: transferFrom,
                 permission: 'active',
             }],
             data: {
-                from: 'eosio',
+                from: transferFrom,
                 receiver: accountName,
                 stake_net_quantity: `${acct.netStake.toFixed(4)} ${tokenSymbol}`,
                 stake_cpu_quantity: `${acct.cpuStake.toFixed(4)} ${tokenSymbol}`,
@@ -1176,11 +1180,11 @@ class Launcher {
                 account: 'eosio.token',
                 name: 'transfer',
                 authorization: [{
-                    actor: 'eosio',
+                    actor: transferFrom,
                     permission: 'active',
                 }],
                 data: {
-                    from: 'eosio',
+                    from: transferFrom,
                     to: accountName,
                     quantity: `${acct.liquid.toFixed(4)} ${tokenSymbol}`,
                     memo: memo ? memo : `${tokenSymbol} Genesis`
