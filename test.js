@@ -1,4 +1,5 @@
+console.time('launch');
 let Launcher = require("./Launcher");
 let l = new Launcher();
 l.launch();
-//l.test();
+console.time('launch');
