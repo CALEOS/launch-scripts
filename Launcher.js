@@ -940,7 +940,7 @@ class Launcher {
         for (let i = 1; i < recoveredLines.length; i++) {
             let line = recoveredLines[i];
             let parts = line.split(',');
-            if (parts.length < 3) {
+            if (parts.length < 2) {
                 this.log(`Key recovery line invalid: ${line}`);
                 continue;
             }
