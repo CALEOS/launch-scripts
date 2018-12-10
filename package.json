@@ -19,6 +19,7 @@
     "node-fetch": "^2.3.0",
     "promise-parallel-throttle": "^3.2.0",
     "readline": "^1.3.0",
+    "request": "^2.88.0",
     "single-line-log": "^1.1.2",
     "text-encoding": "^0.7.0"
   }
