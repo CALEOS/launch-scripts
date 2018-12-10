@@ -220,6 +220,8 @@ class Launcher {
 
     async launch() {
         this.log('Launch beginning...');
+        // Start with the globals from this script, override what is in genesis.json
+        await this.setGlobals(false);
         await this.createEosioAccounts();
         await this.createAndIssueTokens();
         await this.pushContract('eosio.msig');
