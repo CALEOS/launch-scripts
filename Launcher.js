@@ -24,6 +24,10 @@ const frpTfAccountTransferRamBytes = 128000;
 const freeAccount = 'free.tf';
 const freeAccountContractRamBytes = 512000;
 
+//const abpAccounts = ['caleosblocks', 'kainosblkpro', 'blindblocart', 'tlsvenezuela', 'eosbarcelona', 'eosmetaliobp'];
+const abpAccounts = [];
+const abpMsigRamAmount = 1024000;
+
 const ramAdminAccount = 'ramadmin.tf';
 const ramAdminLiquid = '40000.0000';
 const ramAdminMemo = 'RAM Administrator';
@@ -59,6 +63,7 @@ const actionsPerTransaction = 600;
 const injectionThreadCount = 1;
 const maxTrxCpu = 4294967194;
 const maxBlockCpu = 4294967295;
+
 
 // TODO: make sure these values are the final values we want (cpu values are currently at max)
 const globalValues = {
@@ -269,6 +274,7 @@ class Launcher {
 
         await this.pushContract('eosio.arbitration');
         await this.setCodePermission(contracts['eosio.arbitration']);
+        await this.setCodePermission(contracts['eosio.arbitration'], true);
         await this.setupArbitration();
 
         await this.pushContract('telos.tfvt');
@@ -552,7 +558,7 @@ class Launcher {
             }
 
             this.log(`Creating Telos BP account ${accountName} with pubkey ${telosBPAccounts[accountName]}`);
-            await this.createAccount(accountName, telosBPAccounts[accountName], 4096, 1, 1, 0, 'Founding BP');
+            await this.createAccount(accountName, telosBPAccounts[accountName], abpAccounts.indexOf(accountName) > -1 ? abpMsigRamAmount : 4096, 1, 1, 0, 'Founding BP');
         }
 
         for (let accountName in eosBPAccounts) {
@@ -721,8 +727,8 @@ class Launcher {
         this.log('eosio accounts created');
     }
 
-    async setCodePermission(accountName) {
-        return this.setAccountPermission(accountName, 'active', 'active', 'owner', {
+    async setCodePermission(accountName, setOwner = false) {
+        return this.setAccountPermission(accountName, setOwner ? 'owner' : 'active', setOwner ? 'owner' : 'active', setOwner ? '' : 'owner', {
             'threshold': 1,
             'keys': [],
             'waits': [],
