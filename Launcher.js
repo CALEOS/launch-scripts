@@ -208,7 +208,8 @@ const tfvtSetConfig = {
         'start_delay': 1200,
         'leaderboard_duration': 2000000,
         'election_frequency': 14515200,
-        'last_board_election_time': 0
+        'last_board_election_time': 0,
+        'is_active_election': false
     }
 };
 
