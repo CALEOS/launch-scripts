@@ -22,7 +22,7 @@ const tfAccountContractRamBytes = 1024000;
 const frpTfAccountTransferRamBytes = 128000;
 
 const freeAccount = 'free.tf';
-const freeAccountContractRamBytes = 512000;
+const freeAccountContractRamBytes = 1024000;
 
 //const abpAccounts = ['caleosblocks', 'kainosblkpro', 'blindblocart', 'tlsvenezuela', 'eosbarcelona', 'eosmetaliobp'];
 const abpAccounts = [];
