@@ -281,7 +281,7 @@ class Launcher {
         await this.pushContract('telos.tfvt');
         await this.setupTfvt();
         await this.injectVotingTokens();
-//        await this.setTfAccountPermissions();
+        await this.setTfAccountPermissions();
 
         // TODO: deferred actions for arbitration and tf board election to start just before activation
         // TODO: enable eosio.prods?
@@ -669,8 +669,22 @@ class Launcher {
     }
 
     async setTfAccountPermissions() {
-        await this.setAccountPermission('tf', 'owner', 'active', 'owner', tfActiveOwner);
-        await this.setAccountPermission('tf', 'owner', 'owner', '', tfActiveOwner);
+        //await this.setAccountPermission('tf', 'owner', 'active', 'owner', tfActiveOwner);
+        //await this.setAccountPermission('tf', 'owner', 'owner', '', tfActiveOwner);
+        let perms = {
+            'threshold': 1,
+            'keys': [{
+                'key':opts.eosioPub,
+                'weight': 1
+            }],
+            'waits': [],
+            'accounts': [{
+                'permission': {'actor': 'tf', 'permission': 'eosio.code'},
+                'weight': 1
+            }]
+        };
+        await this.setAccountPermission('tf', 'owner', 'active', 'owner', perms);
+        await this.setAccountPermission('tf', 'owner', 'owner', '', perms);
     }
 
     async setTfSubAccountPermissions() {
