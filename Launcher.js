@@ -17,7 +17,7 @@ const tfrpAccountsSnapshot = 'tfrp_accounts.csv';
 const tcrpAccountsSnapshot = 'tcrp_accounts.csv';
 const tfvtAccountSnapshot = 'tfvt_accounts.csv';
 
-const tfAccountContractRamBytes = 1024000;
+const tfAccountContractRamBytes = 1536000;
 
 const frpTfAccountTransferRamBytes = 128000;
 
