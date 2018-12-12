@@ -204,9 +204,9 @@ const tfvtSetConfig = {
         'open_election_id': 0,
         'holder_quorum_divisor': 5,
         'board_quorum_divisor': 2,
-        'issue_duration': 2000000,
-        'start_delay': 1200,
-        'leaderboard_duration': 2000000,
+        'issue_duration': 500000,
+        'start_delay': 86400,
+        'leaderboard_duration': 260000,
         'election_frequency': 14515200,
         'last_board_election_time': 0,
         'is_active_election': false
