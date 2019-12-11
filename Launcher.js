@@ -1296,8 +1296,9 @@ class Launcher {
     }
 
     async runTeclos(command) {
-        const {stdout, stderr} = await exec(this.teclos + ' ' + command);
-        this.log(`Result of "${command}":\n ${stdout}\n`);
+        const fullCommand = `${this.teclos} ${command}`
+        const {stdout, stderr} = await exec(fullCommand);
+        this.log(`Result of "${}${command}":\nSTDOUT: ${stdout}\n\nSTDERR: ${stderr}`);
     }
 
     forcePrecision(val) {
