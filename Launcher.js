@@ -114,6 +114,7 @@ const eosioAccounts = [
     'eosio.names',
     'eosio.ram',
     'eosio.ramfee',
+    'eosio.rex',
     'eosio.saving',
     'eosio.stake',
     'eosio.token',
@@ -136,7 +137,8 @@ const contracts = {
     'eosio.trail': 'eosio.trail',
     'eosio.wrap': 'eosio.wrap',
     'telos.tfvt': 'tf',
-    'telos.free': 'free.tf'
+    'telos.free': 'free.tf',
+    'eosio.tedp': 'exrsrv.tf'
 };
 
 const trailVoteTokenSettings = {
@@ -239,9 +241,9 @@ class Launcher {
         await this.pushContract('eosio.wrap');
         await this.pushContract('eosio.system');
 
+        await this.activateFeatures();
         this.loadApi();
 
-        await this.activateFeatures();
         await this.initSystem();
 
         // Start with the globals from this script, override what is in genesis.json
@@ -279,6 +281,10 @@ class Launcher {
         await this.pushContract('eosio.amend');
         await this.setCodePermission(contracts['eosio.amend']);
         await this.setupAmend();
+
+        await this.pushContract('eosio.tedp');
+        await this.setCodePermission(contracts['eosio.tedp']);
+        await this.setupTedp();
 
         await this.pushContract('eosio.arbitration');
         await this.setCodePermission(contracts['eosio.arbitration']);
@@ -551,6 +557,43 @@ class Launcher {
                 data: amendSetEnv
             }
         ]);
+    }
+
+    async setupTedp() {
+        this.log('Setting up tedp');
+        return this.sendActions([
+            {
+                account: 'exrsrv.tf',
+                name: 'settf',
+                authorization: [{
+                    actor: 'eosio',
+                    permission: 'active',
+                }],
+                data: {
+                    'amount': 32876
+                }
+            }, {
+                account: 'exrsrv.tf',
+                name: 'setecondev',
+                authorization: [{
+                    actor: 'eosio',
+                    permission: 'active',
+                }],
+                data: {
+                    'amount': 16438
+                }
+            }, {
+                account: 'exrsrv.tf',
+                name: 'setrex',
+                authorization: [{
+                    actor: 'eosio',
+                    permission: 'active',
+                }],
+                data: {
+                    'amount': 685
+                }
+            }
+        ])
     }
 
     async setupTfvt() {
@@ -1286,6 +1329,14 @@ class Launcher {
         //let wasm = contractDir + name + '.wasm';
         //let abi = contractDir + name + '.abi';
         await this.runTeclos(`set contract ${contracts[name]} ${contractDir}`);
+    }
+
+    async setRexABI() {
+        await this.unlockWallet();
+        let rexABI = `${this.contractsDir}/build/contracts/eosio.system/.rex/rex.results.abi`;
+        //let wasm = contractDir + name + '.wasm';
+        //let abi = contractDir + name + '.abi';
+        await this.runTeclos(`set abi eosio.rex ${rexABI}`);
     }
 
     async unlockWallet() {
