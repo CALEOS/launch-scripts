@@ -11,7 +11,7 @@ const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 const readline = require('readline');
 const fetch = require('node-fetch');
-const {TextDecoder, TextEncoder} = require('text-encoding');
+const { TextDecoder, TextEncoder } = require('text-encoding');
 const opts = require('./opts.js');
 
 const ramAccountsSnapshot = 'ram_accounts.csv';
@@ -221,7 +221,7 @@ class Launcher {
 
     constructor() {
         this.eosjs = eosjs;
-        this.jsonrpc = new JsonRpc(endpoint, {fetch});
+        this.jsonrpc = new JsonRpc(endpoint, { fetch });
         this.contractsDir = opts.contractsDir.replace(/\/$/, '');
         this.teclos = opts.teclos + ' -u http://127.0.0.1:' + opts.apiPort;
         this.sigProvider = new JsSignatureProvider([opts.eosioPrivate]);
@@ -238,15 +238,15 @@ class Launcher {
 
         await this.pushContract('eosio.wrap');
         await this.pushContract('eosio.system');
-        await this.sleep(2000);
-        await this.activateFeatures();
 
         this.loadApi();
+
+        await this.activateFeatures();
         await this.initSystem();
-        
+
         // Start with the globals from this script, override what is in genesis.json
         await this.setGlobals(false);
-        
+
         await this.setMsigPriv();
         await this.setWrapPriv();
 
@@ -348,9 +348,9 @@ class Launcher {
                 return;
             }
 
-            let split = skipSplit ? {balance} : this.splitBalance(balance);
+            let split = skipSplit ? { balance } : this.splitBalance(balance);
 
-            snapMap[accountName] = Object.assign({ramBytes, pubKey, accountName}, split);
+            snapMap[accountName] = Object.assign({ ramBytes, pubKey, accountName }, split);
         });
 
         return snapMap;
@@ -409,40 +409,40 @@ class Launcher {
     }
 
     async preactivate() {
-	console.log("Preactivating features");
+        console.log("Preactivating features");
         let response = await axios.post(`${endpoint}/v1/producer/get_supported_protocol_features`, {})
-	let featureObj = response.data
-	this.features = [];
+        let featureObj = response.data
+        this.features = [];
         for (let i = 0; i < featureObj.length; i++) {
             console.log(`FEATURE: ${featureObj[i].specification[0].value} = ${featureObj[i].feature_digest}`)
             if (featureObj[i].specification[0].value === 'PREACTIVATE_FEATURE')
-                await axios.post(`${endpoint}/v1/producer/schedule_protocol_feature_activations`, {protocol_features_to_activate: [featureObj[i].feature_digest]})
-	    else
-		this.features.push(featureObj[i].feature_digest)
-	}
-	
+                await axios.post(`${endpoint}/v1/producer/schedule_protocol_feature_activations`, { protocol_features_to_activate: [featureObj[i].feature_digest] })
+            else
+                this.features.push(featureObj[i].feature_digest)
+        }
+
     }
 
     async activateFeatures() {
-	console.log("Activating features");
-	    for (let i = 0; i < this.features.length; i++) {
-	        console.log(`Activating ${this.features[i]}`);
-		await this.sendActions([
-			    {
-				account: 'eosio',
-				name: 'activate',
-				authorization: [{
-				    actor: 'eosio',
-				    permission: 'active'
-				}],
-				data: {
-				    feature_digest: this.features[i]
-				}
-			    }
-			]);
-	    }
+        console.log("Activating features");
+        for (let i = 0; i < this.features.length; i++) {
+            console.log(`Activating ${this.features[i]}`);
+            await this.sendActions([
+                {
+                    account: 'eosio',
+                    name: 'activate',
+                    authorization: [{
+                        actor: 'eosio',
+                        permission: 'active'
+                    }],
+                    data: {
+                        feature_digest: this.features[i]
+                    }
+                }
+            ]);
+        }
     }
-    
+
     async setGlobals(highCpu) {
         this.log(`Setting globals to ${highCpu ? 'high' : 'low'} cpu`);
         let globals = Object.assign({}, globalValues);
@@ -565,7 +565,7 @@ class Launcher {
                     permission: 'active',
                 }],
                 data: tfvtSetConfig
-            },{
+            }, {
                 account: 'tf',
                 name: 'inittfvt',
                 authorization: [{
@@ -575,7 +575,7 @@ class Launcher {
                 data: {
                     initial_info_link: ''
                 }
-            },{
+            }, {
                 account: 'tf',
                 name: 'inittfboard',
                 authorization: [{
@@ -716,12 +716,12 @@ class Launcher {
         let perms = {
             'threshold': 1,
             'keys': [{
-                'key':opts.eosioPub,
+                'key': opts.eosioPub,
                 'weight': 1
             }],
             'waits': [],
             'accounts': [{
-                'permission': {'actor': 'tf', 'permission': 'eosio.code'},
+                'permission': { 'actor': 'tf', 'permission': 'eosio.code' },
                 'weight': 1
             }]
         };
@@ -756,10 +756,10 @@ class Launcher {
             'keys': [],
             'waits': [],
             'accounts': [{
-                'permission': {'actor': freeAccount, 'permission': 'eosio.code'},
+                'permission': { 'actor': freeAccount, 'permission': 'eosio.code' },
                 'weight': 1
             }, {
-                'permission': {'actor': 'tf', 'permission': 'active'},
+                'permission': { 'actor': 'tf', 'permission': 'active' },
                 'weight': 1
             }]
         });
@@ -790,10 +790,10 @@ class Launcher {
             'keys': [],
             'waits': [],
             'accounts': [{
-                'permission': {'actor': 'eosio', 'permission': 'active'},
+                'permission': { 'actor': 'eosio', 'permission': 'active' },
                 'weight': 1
             }, {
-                'permission': {'actor': accountName, 'permission': 'eosio.code'},
+                'permission': { 'actor': accountName, 'permission': 'eosio.code' },
                 'weight': 1
             }]
         });
@@ -1033,7 +1033,7 @@ class Launcher {
 
     async getGenesisAccounts() {
         let _this = this;
-        return new Promise(async function(resolve, reject) {
+        return new Promise(async function (resolve, reject) {
             let accounts = {};
             let snapMeta = {};
             let genesis = await _this.getSnapshot('tlos_genesis_snapshot.csv');
@@ -1173,7 +1173,7 @@ class Launcher {
     }
 
     async readCsv(path, callback) {
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
             let rl = readline.createInterface({
                 input: fs.createReadStream(path),
                 terminal: false
@@ -1298,7 +1298,7 @@ class Launcher {
 
     async runTeclos(command) {
         const fullCommand = `${this.teclos} ${command}`
-        const {stdout, stderr} = await exec(fullCommand);
+        const { stdout, stderr } = await exec(fullCommand);
         this.log(`Result of "${fullCommand}":\nSTDOUT: ${stdout}\n\nSTDERR: ${stderr}`);
     }
 
