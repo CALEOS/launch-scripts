@@ -1,5 +1,9 @@
 'use strict';
 
+const { Api, JsonRpc, RpcError } = require('eosjs');
+const JsSignatureProvider = require('eosjs/dist/eosjs-jssig').default;
+
+const axios = require('axios');
 const request = require('request');
 const eosjs = require('eosjs');
 const util = require('util');
@@ -51,7 +55,7 @@ const ramLaunchActiveOwner = require('./tf.ramlaunch.ao');
 const ramLaunchSellDel = require('./tf.ramlselldel');
 const ramLaunchTransfer = require('./tf.ramltrns');
 
-const endpoint = 'http://localhost:' + opts.apiPort;
+const endpoint = 'http://127.0.0.1:' + opts.apiPort;
 
 const snapshotSha = 'master';
 const genesisMemo = 'Genesis';
@@ -217,15 +221,16 @@ class Launcher {
 
     constructor() {
         this.eosjs = eosjs;
-        this.jsonrpc = new this.eosjs.JsonRpc(endpoint, {fetch});
+        this.jsonrpc = new JsonRpc(endpoint, {fetch});
         this.contractsDir = opts.contractsDir.replace(/\/$/, '');
         this.teclos = opts.teclos + ' -u http://127.0.0.1:' + opts.apiPort;
-        this.sigProvider = new this.eosjs.JsSignatureProvider([opts.eosioPrivate]);
+        this.sigProvider = new JsSignatureProvider([opts.eosioPrivate]);
         this.loadApi();
     }
 
     async launch() {
         this.log('Launch beginning...');
+        await this.preactivate();
         await this.createEosioAccounts();
         await this.createAndIssueTokens();
         await this.pushContract('eosio.msig');
@@ -233,6 +238,7 @@ class Launcher {
 
         await this.pushContract('eosio.wrap');
         await this.pushContract('eosio.system');
+        await this.activateFeatures();
 
         this.loadApi();
         await this.initSystem();
@@ -293,7 +299,7 @@ class Launcher {
     }
 
     getApi() {
-        return new this.eosjs.Api({
+        return new Api({
             rpc: this.jsonrpc,
             signatureProvider: this.sigProvider,
             textEncoder: new TextEncoder,
@@ -401,6 +407,41 @@ class Launcher {
         });
     }
 
+    async preactivate() {
+	console.log("Preactivating features");
+        let response = await axios.post(`${endpoint}/v1/producer/get_supported_protocol_features`, {})
+	let featureObj = response.data
+	this.features = [];
+        for (let i = 0; i < featureObj.length; i++) {
+            console.log(`FEATURE: ${featureObj[i].specification[0].value} = ${featureObj[i].feature_digest}`)
+            if (featureObj[i].specification[0].value === 'PREACTIVATE_FEATURE')
+                await axios.post(`${endpoint}/v1/producer/schedule_protocol_feature_activations`, {protocol_features_to_activate: [featureObj[i].feature_digest]})
+	    else
+		this.features.push(featureObj[i].feature_digest)
+	}
+	
+    }
+
+    async activateFeatures() {
+	console.log("Activating features");
+	    for (let i = 0; i < this.features.length; i++) {
+	        console.log(`Activating ${this.features[i]}`);
+		await this.sendActions([
+			    {
+				account: 'eosio',
+				name: 'activate',
+				authorization: [{
+				    actor: 'eosio',
+				    permission: 'active'
+				}],
+				data: {
+				    feature_digest: this.features[i]
+				}
+			    }
+			]);
+	    }
+    }
+    
     async setGlobals(highCpu) {
         this.log(`Setting globals to ${highCpu ? 'high' : 'low'} cpu`);
         let globals = Object.assign({}, globalValues);
@@ -1240,7 +1281,7 @@ class Launcher {
 
     async pushContract(name) {
         await this.unlockWallet();
-        let contractDir = `${this.contractsDir}/build/${name}`;
+        let contractDir = `${this.contractsDir}/build/contracts/${name}`;
         //let wasm = contractDir + name + '.wasm';
         //let abi = contractDir + name + '.abi';
         await this.runTeclos(`set contract ${contracts[name]} ${contractDir}`);
