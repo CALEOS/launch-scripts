@@ -241,8 +241,8 @@ class Launcher {
         await this.pushContract('eosio.wrap');
         await this.pushContract('eosio.system');
 
-        await this.activateFeatures();
         this.loadApi();
+        await this.activateFeatures();
 
         await this.initSystem();
 
